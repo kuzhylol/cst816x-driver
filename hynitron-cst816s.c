@@ -39,9 +39,6 @@ struct cst816s_info {
         uint8_t version_info[3];
 
         uint8_t gesture;
-        uint8_t event;
-        uint8_t point;
-
         int x;
         int y;
 };
@@ -142,14 +139,11 @@ static int cst816s_process_touch(struct cst816s_priv *priv)
                 raw = priv->rxtx;
 
                 priv->info.gesture = raw[0];
-                priv->info.point = raw[1];
-                priv->info.event = raw[2] >> 6;
                 priv->info.x = ((raw[2] & 0x0f) << 8) + raw[3];
                 priv->info.y = ((raw[4] & 0x0f) << 8) + raw[5];
 
-                dev_dbg(priv->dev, "x: %d, y: %d", priv->info.x, priv->info.y
-                        "event: %d point %d", priv->info.event, priv->info.point
-                        "gesture: 0x%x\n", priv->info.gesture);
+                dev_dbg(priv->dev, "x: %d, y: %d, gesture: 0x%x\n",
+                        priv->info.x, priv->info.y, priv->info.gesture);
         } else {
                 dev_warn(priv->dev, "request was dropped\n");
         }
