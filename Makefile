@@ -1,4 +1,4 @@
-obj-m += cst816s.o
+obj-m += hynitron-cst816s.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
