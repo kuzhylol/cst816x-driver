@@ -83,7 +83,7 @@ static const struct i2c_device_id cst816s_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, cst816s_id);
 
-static int cst816s_i2c_read_register(struct cst816s_priv *priv, u8 register_addr)
+static int cst816s_i2c_read_register(struct cst816s_priv *priv, u8 reg)
 {
         struct i2c_client *client;
         struct i2c_msg xfer[2];
@@ -94,7 +94,7 @@ static int cst816s_i2c_read_register(struct cst816s_priv *priv, u8 register_addr
         xfer[0].addr = client->addr;
         xfer[0].flags = 0;
         xfer[0].len = 1;
-        xfer[0].buf = &register_addr;
+        xfer[0].buf = &reg;
 
         xfer[1].addr = client->addr;
         xfer[1].flags = I2C_M_RD;
@@ -147,9 +147,9 @@ static int cst816s_process_touch(struct cst816s_priv *priv)
                 priv->info.x = ((raw[2] & 0x0f) << 8) + raw[3];
                 priv->info.y = ((raw[4] & 0x0f) << 8) + raw[5];
 
-                dev_dbg(priv->dev, "x: %d, y: %d, event: %d point %d, gesture: 0x%x",
-                        priv->info.x, priv->info.y,
-                        priv->info.event, priv->info.point, priv->info.gesture);
+                dev_dbg(priv->dev, "x: %d, y: %d", priv->info.x, priv->info.y
+                        "event: %d point %d", priv->info.event, priv->info.point
+                        "gesture: 0x%x\n", priv->info.gesture);
         } else {
                 dev_warn(priv->dev, "request was dropped\n");
         }
