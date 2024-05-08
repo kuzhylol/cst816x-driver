@@ -39,8 +39,8 @@ struct cst816s_info {
         uint8_t version_info[3];
 
         uint8_t gesture;
-        int x;
-        int y;
+        uint8_t x;
+        uint8_t y;
 };
 
 struct cst816s_priv {
