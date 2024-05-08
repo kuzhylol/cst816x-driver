@@ -147,9 +147,9 @@ static int cst816s_process_touch(struct cst816s_priv *priv)
                 priv->info.x = ((raw[2] & 0x0f) << 8) + raw[3];
                 priv->info.y = ((raw[4] & 0x0f) << 8) + raw[5];
 
-                dev_warn(priv->dev, "x: %d, y: %d, event: %d point %d, gesture: 0x%x",
-                         priv->info.x, priv->info.y,
-                         priv->info.event, priv->info.point, priv->info.gesture);
+                dev_dbg(priv->dev, "x: %d, y: %d, event: %d point %d, gesture: 0x%x",
+                        priv->info.x, priv->info.y,
+                        priv->info.event, priv->info.point, priv->info.gesture);
         } else {
                 dev_warn(priv->dev, "request was dropped\n");
         }
@@ -313,7 +313,7 @@ static int cst816s_probe(struct i2c_client *client, const struct i2c_device_id *
                 goto free_input;
         }
 
-        dev_info(dev, "ts attached, version: %u, version info: %u.%u.%u",
+        dev_info(dev, "touchscreen attached, version: %u, version info: %u.%u.%u",
                  priv->info.version,
                  priv->info.version_info[2],
                  priv->info.version_info[1],
