@@ -294,9 +294,9 @@ static int cst816x_probe(struct i2c_client *client,
         }
 
         if (priv->reset) {
-                gpiod_set_value_cansleep(priv->reset, GPIOD_OUT_LOW);
-                msleep(20);
-                gpiod_set_value_cansleep(priv->reset, GPIOD_OUT_HIGH);
+                gpiod_set_value_cansleep(priv->reset, 0);
+                msleep(50);
+                gpiod_set_value_cansleep(priv->reset, 1);
         }
 
         rc = cst816x_register_input(priv);
