@@ -18,8 +18,15 @@
 #define CST816X_MAX_Y CST816X_MAX_X
 
 enum cst816x_commands {
-        CST816X_GET_RAW_CMD = 0x01,
-        CST816X_GET_VERSION_CMD = 0xA7,
+        CST816X_ENABLE_DOUBLE_TAP = 0x01,
+        CST816X_ENABLE_UP_DOWN_SWIPE = 0x02,
+        CST816X_ENABLE_LEFT_RIGHT_SWIPE = 0x04,
+};
+
+enum cst816x_registers {
+        CST816X_GET_RAW = 0x01,
+        CST816X_GET_MODEL = 0xA7,
+        CST816X_SET_MOTION = 0xEC,
 };
 
 enum cst816_gesture_id {
@@ -28,13 +35,13 @@ enum cst816_gesture_id {
     CST816X_SWIPE_DOWN = 0x02,
     CST816X_SWIPE_LEFT = 0x03,
     CST816X_SWIPE_RIGHT = 0x04,
-    CST816X_SINGLE_CLICK = 0x05,
-    CST816X_DOUBLE_CLICK = 0x0B,
+    CST816X_SINGLE_TAP = 0x05,
+    CST816X_DOUBLE_TAP = 0x0B,
     CST816X_LONG_PRESS = 0x0C,
 };
 
 struct cst816x_info {
-        uint8_t version[3];
+        uint8_t model[3];
 
         uint8_t gesture;
         uint8_t x;
@@ -67,8 +74,8 @@ static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
     {CST816X_SWIPE_DOWN, KEY_DOWN},
     {CST816X_SWIPE_LEFT, KEY_LEFT},
     {CST816X_SWIPE_RIGHT, KEY_RIGHT},
-    {CST816X_SINGLE_CLICK, BTN_TOUCH},
-    {CST816X_DOUBLE_CLICK, BTN_TOOL_DOUBLETAP},
+    {CST816X_SINGLE_TAP, BTN_TOUCH},
+    {CST816X_DOUBLE_TAP, BTN_TOOL_DOUBLETAP},
     {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
@@ -78,6 +85,31 @@ static const struct i2c_device_id cst816x_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, cst816x_id);
 
+static int cst816x_i2c_write_reg(struct cst816x_priv *priv, u8 reg, u8 cmd)
+{
+        struct i2c_client *client;
+        struct i2c_msg xfer;
+        int rc;
+
+        client = priv->client;
+
+        priv->rxtx[0] = reg;
+        priv->rxtx[1] = cmd;
+
+        xfer.addr = client->addr;
+        xfer.flags = 0;
+        xfer.len = 2;
+        xfer.buf = priv->rxtx;
+
+        rc = i2c_transfer(client->adapter, &xfer , 1);
+        if (rc < 0) {
+                dev_err(&client->dev, "i2c tx err: %d\n", rc);
+                rc = -EIO;
+        }
+
+        return rc;
+
+}
 
 static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 {
@@ -89,7 +121,7 @@ static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 
         xfer[0].addr = client->addr;
         xfer[0].flags = 0;
-        xfer[0].len = 1;
+        xfer[0].len = sizeof(reg);
         xfer[0].buf = &reg;
 
         xfer[1].addr = client->addr;
@@ -133,7 +165,7 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
         uint8_t *raw;
         int rc;
 
-        rc = cst816x_i2c_read_reg(priv, CST816X_GET_RAW_CMD);
+        rc = cst816x_i2c_read_reg(priv, CST816X_GET_RAW);
         if (!rc) {
                 raw = priv->rxtx;
 
@@ -296,16 +328,16 @@ static int cst816x_probe(struct i2c_client *client,
                 dev_warn(dev, "no IRQ will use for cst816x\n");
         }
 
-        if (cst816x_i2c_read_reg(priv, CST816X_GET_VERSION_CMD) == 0) {
-                memcpy(priv->info.version, priv->rxtx,
-                       ARRAY_SIZE(priv->info.version));
+        if (cst816x_i2c_read_reg(priv, CST816X_GET_MODEL) == 0) {
+                memcpy(priv->info.model, priv->rxtx,
+                       ARRAY_SIZE(priv->info.model));
         } else {
                 goto free_input;
         }
 
-        dev_info(dev, "touchscreen attached, version: %u.%u.%u",
-                 priv->info.version[2], priv->info.version[1],
-                 priv->info.version[0]);
+        dev_info(dev, "touchscreen attached, model: %u.%u.%u",
+                 priv->info.model[2], priv->info.model[1],
+                 priv->info.model[0]);
 
 free_input:
         if (rc) {
