@@ -25,7 +25,7 @@ enum cst816x_commands {
 
 enum cst816x_registers {
         CST816X_GET_MOTION = 0x01,
-        CST816X_GET_MODEL = 0xA7,
+        CST816X_GET_VERSION = 0xA7,
         CST816X_SET_MOTION = 0xEC,
 };
 
@@ -41,7 +41,7 @@ enum cst816_gesture_id {
 };
 
 struct cst816x_info {
-        uint8_t model[3];
+        uint8_t version[3];
 
         uint8_t gesture;
         uint8_t x;
@@ -329,16 +329,16 @@ static int cst816x_probe(struct i2c_client *client,
                 dev_warn(dev, "no IRQ will use for cst816x\n");
         }
 
-        if (cst816x_i2c_read_reg(priv, CST816X_GET_MODEL) == 0) {
-                memcpy(priv->info.model, priv->rxtx,
-                       ARRAY_SIZE(priv->info.model));
+        if (cst816x_i2c_read_reg(priv, CST816X_GET_VERSION) == 0) {
+                memcpy(priv->info.version, priv->rxtx,
+                       ARRAY_SIZE(priv->info.version));
         } else {
                 goto free_input;
         }
 
-        dev_info(dev, "touchscreen attached, model: %u.%u.%u",
-                 priv->info.model[2], priv->info.model[1],
-                 priv->info.model[0]);
+        dev_info(dev, "touchscreen attached, version: %u.%u.%u",
+                 priv->info.version[2], priv->info.version[1],
+                 priv->info.version[0]);
 
 free_input:
         if (rc) {
