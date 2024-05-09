@@ -21,12 +21,14 @@ enum cst816x_commands {
         CST816X_ENABLE_DOUBLE_TAP = 0x01,
         CST816X_ENABLE_UP_DOWN_SWIPE = 0x02,
         CST816X_ENABLE_LEFT_RIGHT_SWIPE = 0x04,
+        CST816X_ENABLE_STANDBY_MODE = 0x03,
 };
 
 enum cst816x_registers {
         CST816X_GET_MOTION = 0x01,
         CST816X_GET_VERSION = 0xA7,
         CST816X_SET_MOTION = 0xEC,
+        CST816X_SET_STANDBY = 0xA5,
 };
 
 enum cst816_gesture_id {
@@ -227,6 +229,14 @@ err:
         return rc;
 }
 
+static void cst816x_reset(struct cst816x_priv *priv)
+{
+        gpiod_set_value_cansleep(priv->reset, 0);
+        msleep(20);
+        gpiod_set_value_cansleep(priv->reset, 1);
+        msleep(20);
+}
+
 static void wq_cb(struct work_struct *work)
 {
         struct cst816x_priv *priv =
@@ -255,6 +265,24 @@ static irqreturn_t cst815s_irq_cb(int irq, void *cookie)
 
         return IRQ_HANDLED;
 }
+
+static int cst816x_suspend(struct device *dev)
+{
+        struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
+
+        return cst816x_i2c_write_reg(priv, CST816X_SET_STANDBY, CST816X_ENABLE_STANDBY_MODE);
+}
+
+static int cst816x_resume(struct device *dev)
+{
+        struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
+
+        cst816x_reset(priv);
+
+        return 0;
+}
+
+static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
 
 static int cst816x_probe(struct i2c_client *client,
                          const struct i2c_device_id *id)
@@ -294,10 +322,7 @@ static int cst816x_probe(struct i2c_client *client,
         }
 
         if (priv->reset) {
-                gpiod_set_value_cansleep(priv->reset, 0);
-                msleep(20);
-                gpiod_set_value_cansleep(priv->reset, 1);
-                msleep(20);
+                cst816x_reset(priv);
         }
 
         rc = cst816x_register_input(priv);
@@ -314,9 +339,8 @@ static int cst816x_probe(struct i2c_client *client,
         }
 
         if (client->irq > 0) {
-                rc = devm_request_irq(dev, client->irq,
-                                      cst815s_irq_cb,
-                                      IRQF_TRIGGER_RISING,
+                rc = devm_request_irq(dev, client->irq, cst815s_irq_cb,
+                                      IRQF_TRIGGER_RISING | IRQF_ONESHOT,
                                       dev->driver->name, priv);
                 if (rc) {
                         dev_err(dev, "IRQ probe err: %d\n", client->irq);
@@ -363,6 +387,7 @@ static struct i2c_driver cst816x_driver = {
         .driver = {
                 .name = "cst816x",
                 .of_match_table = cst816x_of_match,
+                .pm = pm_sleep_ptr(&cst816x_pm_ops),
         },
         .id_table = cst816x_id,
         .probe = cst816x_probe
