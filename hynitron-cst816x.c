@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Driver for I2C connected CST816S touchsreen
+ * Driver for I2C connected CST816X touchsreen
  *
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
@@ -14,36 +14,34 @@
 #include <linux/input/mt.h>
 #include <linux/input/touchscreen.h>
 
-#define CST816S_MAX_X 240
-#define CST816S_MAX_Y CST816S_MAX_X
+#define CST816X_MAX_X 240
+#define CST816X_MAX_Y CST816X_MAX_X
 
-enum cst816s_commands {
-        CST816S_GET_RAW_CMD = 0x01,
-        CST816S_GET_VERSION_CMD = 0x15,
-        CST816S_GET_VERSION_INFO_CMD = 0xA7,
+enum cst816x_commands {
+        CST816X_GET_RAW_CMD = 0x01,
+        CST816X_GET_VERSION_CMD = 0xA7,
 };
 
 enum cst816_gesture_id {
-    CST816S_NONE = 0x00,
-    CST816S_SWIPE_UP = 0x01,
-    CST816S_SWIPE_DOWN = 0x02,
-    CST816S_SWIPE_LEFT = 0x03,
-    CST816S_SWIPE_RIGHT = 0x04,
-    CST816S_SINGLE_CLICK = 0x05,
-    CST816S_DOUBLE_CLICK = 0x0B,
-    CST816S_LONG_PRESS = 0x0C,
+    CST816X_NONE = 0x00,
+    CST816X_SWIPE_UP = 0x01,
+    CST816X_SWIPE_DOWN = 0x02,
+    CST816X_SWIPE_LEFT = 0x03,
+    CST816X_SWIPE_RIGHT = 0x04,
+    CST816X_SINGLE_CLICK = 0x05,
+    CST816X_DOUBLE_CLICK = 0x0B,
+    CST816X_LONG_PRESS = 0x0C,
 };
 
-struct cst816s_info {
-        uint8_t version;
-        uint8_t version_info[3];
+struct cst816x_info {
+        uint8_t version[3];
 
         uint8_t gesture;
         uint8_t x;
         uint8_t y;
 };
 
-struct cst816s_priv {
+struct cst816x_priv {
         struct device *dev;
         struct i2c_client *client;
         struct gpio_desc *reset;
@@ -52,35 +50,36 @@ struct cst816s_priv {
         struct mutex lock;
         struct work_struct work;
         struct touchscreen_properties prop;
-        struct cst816s_info info;
+        struct cst816x_info info;
 
         u8 rxtx[8];
 
         int irq;
 };
 
-struct cst816s_gesture_mapping {
+struct cst816x_gesture_mapping {
     enum cst816_gesture_id gesture_id;
     int event_code;
 };
 
-static const struct cst816s_gesture_mapping cst816s_gesture_map[] = {
-    {CST816S_SWIPE_UP, KEY_UP},
-    {CST816S_SWIPE_DOWN, KEY_DOWN},
-    {CST816S_SWIPE_LEFT, KEY_LEFT},
-    {CST816S_SWIPE_RIGHT, KEY_RIGHT},
-    {CST816S_SINGLE_CLICK, BTN_TOUCH},
-    {CST816S_DOUBLE_CLICK, BTN_TOOL_DOUBLETAP},
-    {CST816S_LONG_PRESS, BTN_TOOL_TRIPLETAP}
+static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
+    {CST816X_SWIPE_UP, KEY_UP},
+    {CST816X_SWIPE_DOWN, KEY_DOWN},
+    {CST816X_SWIPE_LEFT, KEY_LEFT},
+    {CST816X_SWIPE_RIGHT, KEY_RIGHT},
+    {CST816X_SINGLE_CLICK, BTN_TOUCH},
+    {CST816X_DOUBLE_CLICK, BTN_TOOL_DOUBLETAP},
+    {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
-static const struct i2c_device_id cst816s_id[] = {
+static const struct i2c_device_id cst816x_id[] = {
     { "cst816s", 0 },
     { }
 };
-MODULE_DEVICE_TABLE(i2c, cst816s_id);
+MODULE_DEVICE_TABLE(i2c, cst816x_id);
 
-static int cst816s_i2c_read_register(struct cst816s_priv *priv, u8 reg)
+
+static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 {
         struct i2c_client *client;
         struct i2c_msg xfer[2];
@@ -100,22 +99,22 @@ static int cst816s_i2c_read_register(struct cst816s_priv *priv, u8 reg)
 
         rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
         if (rc < 0) {
-                dev_err(&client->dev, "i2c xfer err: %d\n", rc);
+                dev_err(&client->dev, "i2c rx err: %d\n", rc);
                 rc = -EIO;
         }
 
         return rc == ARRAY_SIZE(xfer) ? 0 : -EIO;
 }
 
-static void report_gesture_event(struct cst816s_priv *priv,
+static void report_gesture_event(struct cst816x_priv *priv,
                                  enum cst816_gesture_id gesture_id) {
-        const struct cst816s_gesture_mapping *mapping;
+        const struct cst816x_gesture_mapping *mapping;
 
         mapping = NULL;
 
-        for (uint8_t i = 0; i < ARRAY_SIZE(cst816s_gesture_map); i++) {
-                if (cst816s_gesture_map[i].gesture_id == gesture_id) {
-                        mapping = &cst816s_gesture_map[i];
+        for (uint8_t i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+                if (cst816x_gesture_map[i].gesture_id == gesture_id) {
+                        mapping = &cst816x_gesture_map[i];
                         break;
                 }
         }
@@ -129,12 +128,12 @@ static void report_gesture_event(struct cst816s_priv *priv,
         }
 }
 
-static int cst816s_process_touch(struct cst816s_priv *priv)
+static int cst816x_process_touch(struct cst816x_priv *priv)
 {
         uint8_t *raw;
         int rc;
 
-        rc = cst816s_i2c_read_register(priv, CST816S_GET_RAW_CMD);
+        rc = cst816x_i2c_read_reg(priv, CST816X_GET_RAW_CMD);
         if (!rc) {
                 raw = priv->rxtx;
 
@@ -151,7 +150,7 @@ static int cst816s_process_touch(struct cst816s_priv *priv)
         return rc;
 }
 
-static int cst816s_register_input(struct cst816s_priv *priv)
+static int cst816x_register_input(struct cst816x_priv *priv)
 {
         int rc;
 
@@ -163,20 +162,20 @@ static int cst816s_register_input(struct cst816s_priv *priv)
                 goto err;
         }
 
-        priv->input->name = "CST816S Touchscreen";
+        priv->input->name = "CST816X Touchscreen";
         priv->input->phys = "input/ts";
         priv->input->id.bustype = BUS_I2C;
         input_set_drvdata(priv->input, priv);
 
-        for (uint8_t i = 0; i < ARRAY_SIZE(cst816s_gesture_map); i++) {
+        for (uint8_t i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
                 input_set_capability(priv->input, EV_KEY,
-                                     cst816s_gesture_map[i].event_code);
+                                     cst816x_gesture_map[i].event_code);
         }
 
         input_set_abs_params(priv->input, ABS_MT_POSITION_X,
-                             0, CST816S_MAX_X, 0, 0);
+                             0, CST816X_MAX_X, 0, 0);
         input_set_abs_params(priv->input, ABS_MT_POSITION_Y,
-                             0, CST816S_MAX_Y, 0, 0);
+                             0, CST816X_MAX_Y, 0, 0);
 
         rc = input_mt_init_slots(priv->input, 1, INPUT_MT_DIRECT);
         if (rc) {
@@ -198,12 +197,13 @@ err:
 
 static void wq_cb(struct work_struct *work)
 {
-        struct cst816s_priv *priv = container_of(work, struct cst816s_priv, work);
+        struct cst816x_priv *priv =
+                container_of(work, struct cst816x_priv, work);
 
         mutex_lock(&priv->lock);
 
-        if (!cst816s_process_touch(priv)) {
-                if (priv->info.gesture == CST816S_NONE) {
+        if (!cst816x_process_touch(priv)) {
+                if (priv->info.gesture == CST816X_NONE) {
                         touchscreen_report_pos(priv->input, &priv->prop,
                                                priv->info.x, priv->info.y,
                                                true);
@@ -217,16 +217,17 @@ static void wq_cb(struct work_struct *work)
 
 static irqreturn_t cst815s_irq_cb(int irq, void *cookie)
 {
-        struct cst816s_priv *priv = (struct cst816s_priv *)cookie;
+        struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
 
         queue_work(priv->wq, &priv->work);
 
         return IRQ_HANDLED;
 }
 
-static int cst816s_probe(struct i2c_client *client, const struct i2c_device_id *id)
+static int cst816x_probe(struct i2c_client *client,
+                         const struct i2c_device_id *id)
 {
-        struct cst816s_priv *priv;
+        struct cst816x_priv *priv;
         struct device *dev = &client->dev;
         int rc;
 
@@ -238,7 +239,7 @@ static int cst816s_probe(struct i2c_client *client, const struct i2c_device_id *
                 goto err;
         }
 
-        priv->wq = create_workqueue("cst816s-wq");
+        priv->wq = create_workqueue("cst816x-wq");
         if (!priv->wq) {
                 rc = -ENOMEM;
                 dev_err(dev, "workqueue alloc failed: %d\n", rc);
@@ -266,7 +267,7 @@ static int cst816s_probe(struct i2c_client *client, const struct i2c_device_id *
                 gpiod_set_value_cansleep(priv->reset, GPIOD_OUT_HIGH);
         }
 
-        rc = cst816s_register_input(priv);
+        rc = cst816x_register_input(priv);
         if (rc) {
                 goto destroy_wq;
         }
@@ -292,26 +293,19 @@ static int cst816s_probe(struct i2c_client *client, const struct i2c_device_id *
 
                 priv->irq = client->irq;
         } else {
-                dev_warn(dev, "no IRQ will use for cst816s\n");
+                dev_warn(dev, "no IRQ will use for cst816x\n");
         }
 
-        if (cst816s_i2c_read_register(priv, CST816S_GET_VERSION_CMD) == 0) {
-                memcpy(&priv->info.version, priv->rxtx, sizeof(priv->info.version));
+        if (cst816x_i2c_read_reg(priv, CST816X_GET_VERSION_CMD) == 0) {
+                memcpy(priv->info.version, priv->rxtx,
+                       ARRAY_SIZE(priv->info.version));
         } else {
                 goto free_input;
         }
 
-        if (cst816s_i2c_read_register(priv, CST816S_GET_VERSION_INFO_CMD) == 0) {
-                memcpy(priv->info.version_info, priv->rxtx, ARRAY_SIZE(priv->info.version_info));
-        } else {
-                goto free_input;
-        }
-
-        dev_info(dev, "touchscreen attached, version: %u, version info: %u.%u.%u",
-                 priv->info.version,
-                 priv->info.version_info[2],
-                 priv->info.version_info[1],
-                 priv->info.version_info[0]);
+        dev_info(dev, "touchscreen attached, version: %u.%u.%u",
+                 priv->info.version[2], priv->info.version[1],
+                 priv->info.version[0]);
 
 free_input:
         if (rc) {
@@ -326,23 +320,23 @@ err:
         return rc;
 }
 
-static const struct of_device_id cst816s_of_match[] = {
+static const struct of_device_id cst816x_of_match[] = {
     { .compatible = "cst,cst816s", },
     { }
 };
-MODULE_DEVICE_TABLE(of, cst816s_of_match);
+MODULE_DEVICE_TABLE(of, cst816x_of_match);
 
-static struct i2c_driver cst816s_driver = {
+static struct i2c_driver cst816x_driver = {
         .driver = {
-                .name = "cst816s",
-                .of_match_table = cst816s_of_match,
+                .name = "cst816x",
+                .of_match_table = cst816x_of_match,
         },
-        .id_table = cst816s_id,
-        .probe = cst816s_probe
+        .id_table = cst816x_id,
+        .probe = cst816x_probe
 };
 
-module_i2c_driver(cst816s_driver);
+module_i2c_driver(cst816x_driver);
 
 MODULE_AUTHOR("Oleh Kuzhylnyi <kuzhylol@gmail.com>");
-MODULE_DESCRIPTION("CST816S Touchscreen Driver");
+MODULE_DESCRIPTION("CST816X Touchscreen Driver");
 MODULE_LICENSE("GPL v2");
