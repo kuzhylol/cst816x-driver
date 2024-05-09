@@ -270,7 +270,8 @@ static int cst816x_suspend(struct device *dev)
 {
         struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
-        return cst816x_i2c_write_reg(priv, CST816X_SET_STANDBY, CST816X_ENABLE_STANDBY_MODE);
+        return cst816x_i2c_write_reg(priv, CST816X_SET_STANDBY,
+                                     CST816X_ENABLE_STANDBY_MODE);
 }
 
 static int cst816x_resume(struct device *dev)
