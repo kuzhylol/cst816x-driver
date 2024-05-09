@@ -24,7 +24,7 @@ enum cst816x_commands {
 };
 
 enum cst816x_registers {
-        CST816X_GET_RAW = 0x01,
+        CST816X_GET_MOTION = 0x01,
         CST816X_GET_MODEL = 0xA7,
         CST816X_SET_MOTION = 0xEC,
 };
@@ -165,7 +165,7 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
         uint8_t *raw;
         int rc;
 
-        rc = cst816x_i2c_read_reg(priv, CST816X_GET_RAW);
+        rc = cst816x_i2c_read_reg(priv, CST816X_GET_MOTION);
         if (!rc) {
                 raw = priv->rxtx;
 
@@ -295,8 +295,9 @@ static int cst816x_probe(struct i2c_client *client,
 
         if (priv->reset) {
                 gpiod_set_value_cansleep(priv->reset, 0);
-                msleep(50);
+                msleep(20);
                 gpiod_set_value_cansleep(priv->reset, 1);
+                msleep(20);
         }
 
         rc = cst816x_register_input(priv);
