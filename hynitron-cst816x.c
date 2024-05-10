@@ -11,8 +11,6 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/of_irq.h>
-#include <linux/input/mt.h>
-#include <linux/input/touchscreen.h>
 
 #define CST816X_MAX_X 240
 #define CST816X_MAX_Y CST816X_MAX_X
@@ -58,7 +56,6 @@ struct cst816x_priv {
         struct input_dev *input;
         struct mutex lock;
         struct work_struct work;
-        struct touchscreen_properties prop;
         struct cst816x_info info;
 
         u8 rxtx[8];
@@ -157,6 +154,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
                 input_report_key(priv->input, mapping->event_code, 1);
                 input_sync(priv->input);
                 input_report_key(priv->input, mapping->event_code, 0);
+                input_sync(priv->input);
         } else {
                 dev_warn(priv->dev, "unknown gesture: %d\n", gesture_id);
         }
@@ -206,17 +204,13 @@ static int cst816x_register_input(struct cst816x_priv *priv)
                                      cst816x_gesture_map[i].event_code);
         }
 
-        input_set_abs_params(priv->input, ABS_MT_POSITION_X,
-                             0, CST816X_MAX_X, 0, 0);
-        input_set_abs_params(priv->input, ABS_MT_POSITION_Y,
-                             0, CST816X_MAX_Y, 0, 0);
+        input_set_abs_params(priv->input, ABS_X,
+                        0, CST816X_MAX_X, 0, 0);
+        input_set_abs_params(priv->input, ABS_Y,
+                        0, CST816X_MAX_Y, 0, 0);
 
-        rc = input_mt_init_slots(priv->input, 1, INPUT_MT_DIRECT);
-        if (rc) {
-                dev_err(priv->dev, "failed to init input slots: %d\n", rc);
-
-                goto err;
-        }
+        input_set_capability(priv->input, EV_ABS, ABS_X);
+        input_set_capability(priv->input, EV_ABS, ABS_Y);
 
         rc = input_register_device(priv->input);
         if (rc) {
@@ -245,13 +239,11 @@ static void wq_cb(struct work_struct *work)
         mutex_lock(&priv->lock);
 
         if (!cst816x_process_touch(priv)) {
-                if (priv->info.gesture == CST816X_NONE) {
-                        touchscreen_report_pos(priv->input, &priv->prop,
-                                               priv->info.x, priv->info.y,
-                                               true);
-                } else {
+                input_report_abs(priv->input, ABS_X, priv->info.x);
+                input_report_abs(priv->input, ABS_Y, priv->info.y);
+
+                if (priv->info.gesture != CST816X_NONE)
                         report_gesture_event(priv, priv->info.gesture);
-                }
         }
 
         mutex_unlock(&priv->lock);
