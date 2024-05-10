@@ -38,14 +38,14 @@ enum cst816x_registers {
 };
 
 enum cst816_gesture_id {
-    CST816X_NONE = 0x00,
-    CST816X_SWIPE_UP = 0x01,
-    CST816X_SWIPE_DOWN = 0x02,
-    CST816X_SWIPE_LEFT = 0x03,
-    CST816X_SWIPE_RIGHT = 0x04,
-    CST816X_SINGLE_TAP = 0x05,
-    CST816X_DOUBLE_TAP = 0x0B,
-    CST816X_LONG_PRESS = 0x0C,
+        CST816X_NONE = 0x00,
+        CST816X_SWIPE_UP = 0x01,
+        CST816X_SWIPE_DOWN = 0x02,
+        CST816X_SWIPE_LEFT = 0x03,
+        CST816X_SWIPE_RIGHT = 0x04,
+        CST816X_SINGLE_TAP = 0x05,
+        CST816X_DOUBLE_TAP = 0x0B,
+        CST816X_LONG_PRESS = 0x0C,
 };
 
 struct cst816x_info {
@@ -72,23 +72,23 @@ struct cst816x_priv {
 };
 
 struct cst816x_gesture_mapping {
-    enum cst816_gesture_id gesture_id;
-    int event_code;
+        enum cst816_gesture_id gesture_id;
+        int event_code;
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-    {CST816X_SWIPE_UP, KEY_UP},
-    {CST816X_SWIPE_DOWN, KEY_DOWN},
-    {CST816X_SWIPE_LEFT, KEY_LEFT},
-    {CST816X_SWIPE_RIGHT, KEY_RIGHT},
-    {CST816X_SINGLE_TAP, BTN_TOUCH},
-    {CST816X_DOUBLE_TAP, BTN_TOOL_DOUBLETAP},
-    {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
+        {CST816X_SWIPE_UP, KEY_UP},
+        {CST816X_SWIPE_DOWN, KEY_DOWN},
+        {CST816X_SWIPE_LEFT, KEY_LEFT},
+        {CST816X_SWIPE_RIGHT, KEY_RIGHT},
+        {CST816X_SINGLE_TAP, BTN_TOUCH},
+        {CST816X_DOUBLE_TAP, BTN_TOOL_DOUBLETAP},
+        {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
 static const struct i2c_device_id cst816x_id[] = {
-    { "cst816s", 0 },
-    { }
+        { "cst816s", 0 },
+        { }
 };
 MODULE_DEVICE_TABLE(i2c, cst816x_id);
 
@@ -412,8 +412,8 @@ err:
 }
 
 static const struct of_device_id cst816x_of_match[] = {
-    { .compatible = "cst,cst816s", },
-    { }
+        { .compatible = "cst,cst816s", },
+        { }
 };
 MODULE_DEVICE_TABLE(of, cst816x_of_match);
 
