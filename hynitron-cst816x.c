@@ -111,8 +111,8 @@ static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
 
         rc = i2c_transfer(client->adapter, &xfer , 1);
         if (rc < 0) {
-                dev_err(&client->dev, "i2c tx err: %d\n", rc);
                 rc = -EIO;
+                dev_err(&client->dev, "i2c tx err: %d\n", rc);
         }
 
         return rc;
@@ -138,8 +138,8 @@ static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
 
         rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
         if (rc < 0) {
-                dev_err(&client->dev, "i2c rx err: %d\n", rc);
                 rc = -EIO;
+                dev_err(&client->dev, "i2c rx err: %d\n", rc);
         }
 
         return rc == ARRAY_SIZE(xfer) ? 0 : -EIO;
@@ -227,8 +227,8 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 
         priv->input = devm_input_allocate_device(priv->dev);
         if (!priv->input) {
-                dev_err(priv->dev, "input device alloc err: %d\n", rc);
                 rc = -ENOMEM;
+                dev_err(priv->dev, "input device alloc err: %d\n", rc);
 
                 goto err;
         }
@@ -365,8 +365,8 @@ static int cst816x_probe(struct i2c_client *client,
 
         priv->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
         if (priv->reset == NULL) {
-                dev_err(dev, "reset GPIO request failed\n");
                 rc = -EIO;
+                dev_err(dev, "reset GPIO request failed\n");
 
                 goto destroy_wq;
         }
@@ -387,8 +387,8 @@ static int cst816x_probe(struct i2c_client *client,
 
         client->irq = of_irq_get(dev->of_node, 0);
         if (client->irq <= 0) {
-                dev_err(dev, "get parent IRQ err: %d\n", rc);
                 rc = -EINVAL;
+                dev_err(dev, "get parent IRQ err: %d\n", rc);
 
                 goto destroy_wq;
         }
