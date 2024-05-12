@@ -31,7 +31,6 @@ enum cst816x_commands {
 
 enum cst816x_registers {
         CST816X_FRAME = 0x01,
-        CST816X_VERSION = 0xA7,
         CST816X_MOTION = 0xEC,
         CST816X_STANDBY = 0xA5,
         CST816X_IRQCTL = 0xFA,
@@ -51,8 +50,6 @@ enum cst816_gesture_id {
 };
 
 struct cst816x_info {
-        uint8_t version[3];
-
         uint8_t gesture;
         uint8_t x;
         uint8_t y;
@@ -394,40 +391,28 @@ static int cst816x_probe(struct i2c_client *client,
 
         client->irq = of_irq_get(dev->of_node, 0);
         if (client->irq <= 0) {
-                rc = -EINVAL;
                 dev_err(dev, "get parent IRQ err: %d\n", rc);
+                rc = -EINVAL;
 
                 goto destroy_wq;
         }
 
-        if (client->irq > 0) {
-                rc = devm_request_threaded_irq(dev, client->irq, NULL,
-                                               cst815s_irq_cb,
-                                               IRQF_ONESHOT | IRQF_NO_AUTOEN,
-                                               dev->driver->name, priv);
-                if (rc) {
-                        dev_err(dev, "IRQ probe err: %d\n", client->irq);
+        if (client->irq <= 0) {
+                dev_err(dev, "IRQ pin is missing\n");
 
-                        goto free_input;
-                }
-
-                priv->irq = client->irq;
-        } else {
-                dev_warn(dev, "no IRQ will use for cst816x\n");
-        }
-
-        if (cst816x_i2c_reg_read(priv, CST816X_VERSION) == 0) {
-                memcpy(priv->info.version, priv->rxtx,
-                       ARRAY_SIZE(priv->info.version));
-        } else {
                 goto free_input;
         }
 
-        enable_irq(priv->irq);
-
-        dev_info(dev, "touchscreen attached, version: %u.%u.%u",
-                 priv->info.version[2], priv->info.version[1],
-                 priv->info.version[0]);
+        rc = devm_request_threaded_irq(dev, client->irq, NULL,
+                                       cst815s_irq_cb,
+                                       IRQF_ONESHOT | IRQF_NO_AUTOEN,
+                                       dev->driver->name, priv);
+        if (!rc) {
+                priv->irq = client->irq;
+                enable_irq(priv->irq);
+        } else {
+                dev_err(dev, "IRQ probe err: %d\n", client->irq);
+        }
 
 free_input:
         if (rc) {
