@@ -318,6 +318,10 @@ static int cst816x_suspend(struct device *dev)
 {
         struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
+        flush_work(&priv->work);
+        disable_irq(priv->irq);
+        del_timer_sync(&priv->timer);
+
         return cst816x_i2c_reg_write(priv, CST816X_STANDBY,
                                      CST816X_SET_STANDBY_MODE);
 }
@@ -327,8 +331,11 @@ static int cst816x_resume(struct device *dev)
         struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
         cst816x_reset(priv);
+        cst816x_setup_regs(priv);
 
-        return cst816x_setup_regs(priv);
+        enable_irq(priv->irq);
+
+        return 0;
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
@@ -396,7 +403,7 @@ static int cst816x_probe(struct i2c_client *client,
         if (client->irq > 0) {
                 rc = devm_request_threaded_irq(dev, client->irq, NULL,
                                                cst815s_irq_cb,
-                                               IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+                                               IRQF_ONESHOT | IRQF_NO_AUTOEN,
                                                dev->driver->name, priv);
                 if (rc) {
                         dev_err(dev, "IRQ probe err: %d\n", client->irq);
@@ -415,6 +422,8 @@ static int cst816x_probe(struct i2c_client *client,
         } else {
                 goto free_input;
         }
+
+        enable_irq(priv->irq);
 
         dev_info(dev, "touchscreen attached, version: %u.%u.%u",
                  priv->info.version[2], priv->info.version[1],
