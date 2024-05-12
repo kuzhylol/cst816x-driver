@@ -172,6 +172,8 @@ static int cst816x_setup_regs(struct cst816x_priv *priv)
 err:
         if (rc < 0) {
                 dev_err(priv->dev, "register setup err: %d\n", rc);
+        } else {
+                rc = 0;
         }
 
         return rc;
@@ -308,7 +310,7 @@ static int cst816x_resume(struct device *dev)
 
         cst816x_reset(priv);
 
-        return 0;
+        return cst816x_setup_regs(priv);
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
