@@ -77,6 +77,7 @@ struct cst816x_gesture_mapping {
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
+        {CST816X_NONE, KEY_UNKNOWN},
         {CST816X_SWIPE_UP, KEY_UP},
         {CST816X_SWIPE_DOWN, KEY_DOWN},
         {CST816X_SWIPE_LEFT, KEY_LEFT},
@@ -182,9 +183,7 @@ err:
 static void report_gesture_event(struct cst816x_priv *priv,
                                  enum cst816_gesture_id gesture_id,
                                  bool state) {
-        const struct cst816x_gesture_mapping *mapping;
-
-        mapping = NULL;
+        const struct cst816x_gesture_mapping *mapping = NULL;
 
         for (uint8_t i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
                 if (cst816x_gesture_map[i].gesture_id == gesture_id) {
@@ -267,9 +266,9 @@ static void cst816x_reset(struct cst816x_priv *priv)
         msleep(20);
 }
 
-static void cst816x_release_cb(struct timer_list *t)
+static void cst816x_release_cb(struct timer_list *timer)
 {
-        struct cst816x_priv *priv = from_timer(priv, t, timer);
+        struct cst816x_priv *priv = from_timer(priv, timer, timer);
 
         mutex_lock(&priv->lock);
 
@@ -289,17 +288,14 @@ static void wq_cb(struct work_struct *work)
         if (!cst816x_process_touch(priv)) {
                 input_report_abs(priv->input, ABS_X, priv->info.x);
                 input_report_abs(priv->input, ABS_Y, priv->info.y);
-
-                if (priv->info.gesture != CST816X_NONE)
-                        report_gesture_event(priv, priv->info.gesture, true);
-
+                report_gesture_event(priv, priv->info.gesture, true);
                 input_sync(priv->input);
         }
 
+        mutex_unlock(&priv->lock);
+
         mod_timer(&priv->timer,
                   jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
-
-        mutex_unlock(&priv->lock);
 }
 
 static irqreturn_t cst815s_irq_cb(int irq, void *cookie)
