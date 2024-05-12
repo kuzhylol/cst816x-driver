@@ -11,9 +11,11 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/of_irq.h>
+#include <linux/timer.h>
 
 #define CST816X_MAX_X 240
 #define CST816X_MAX_Y CST816X_MAX_X
+#define CST816X_EVENT_TIMEOUT_MS 50
 
 enum cst816x_commands {
         CST816X_SET_DOUBLE_TAP = 0x01,
@@ -63,6 +65,7 @@ struct cst816x_priv {
         struct workqueue_struct *wq;
         struct input_dev *input;
         struct mutex lock;
+        struct timer_list timer;
         struct work_struct work;
         struct cst816x_info info;
 
@@ -180,7 +183,8 @@ err:
 }
 
 static void report_gesture_event(struct cst816x_priv *priv,
-                                 enum cst816_gesture_id gesture_id) {
+                                 enum cst816_gesture_id gesture_id,
+                                 bool state) {
         const struct cst816x_gesture_mapping *mapping;
 
         mapping = NULL;
@@ -193,10 +197,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
         }
 
         if (mapping) {
-                input_report_key(priv->input, mapping->event_code, 1);
-                input_sync(priv->input);
-                input_report_key(priv->input, mapping->event_code, 0);
-                input_sync(priv->input);
+                input_report_key(priv->input, mapping->event_code, state);
         } else {
                 dev_warn(priv->dev, "unknown gesture: %d\n", gesture_id);
         }
@@ -269,6 +270,18 @@ static void cst816x_reset(struct cst816x_priv *priv)
         msleep(20);
 }
 
+static void cst816x_event_release(struct timer_list *t)
+{
+        struct cst816x_priv *priv = from_timer(priv, t, timer);
+
+        mutex_lock(&priv->lock);
+
+        report_gesture_event(priv, priv->info.gesture, false);
+        input_sync(priv->input);
+
+        mutex_unlock(&priv->lock);
+}
+
 static void wq_cb(struct work_struct *work)
 {
         struct cst816x_priv *priv =
@@ -281,8 +294,13 @@ static void wq_cb(struct work_struct *work)
                 input_report_abs(priv->input, ABS_Y, priv->info.y);
 
                 if (priv->info.gesture != CST816X_NONE)
-                        report_gesture_event(priv, priv->info.gesture);
+                        report_gesture_event(priv, priv->info.gesture, true);
+
+                input_sync(priv->input);
         }
+
+        mod_timer(&priv->timer,
+                  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
 
         mutex_unlock(&priv->lock);
 }
@@ -340,6 +358,7 @@ static int cst816x_probe(struct i2c_client *client,
 
         mutex_init(&priv->lock);
         INIT_WORK(&priv->work, wq_cb);
+        timer_setup(&priv->timer, cst816x_event_release, 0);
 
         priv->dev = dev;
         priv->client = client;
@@ -375,9 +394,10 @@ static int cst816x_probe(struct i2c_client *client,
         }
 
         if (client->irq > 0) {
-                rc = devm_request_irq(dev, client->irq, cst815s_irq_cb,
-                                      IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-                                      dev->driver->name, priv);
+                rc = devm_request_threaded_irq(dev, client->irq, NULL,
+                                               cst815s_irq_cb,
+                                               IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+                                               dev->driver->name, priv);
                 if (rc) {
                         dev_err(dev, "IRQ probe err: %d\n", client->irq);
 
