@@ -26,7 +26,7 @@ enum cst816x_commands {
         CST816X_SET_POINT_MODE = 0x71,
         CST816X_SET_MIXED_MODE = 0x11,
         CST816X_SET_CYCLE_UNIT = 0x01, // 0.1ms, range: 1 - 30ms
-        CST816X_SET_PULSE_WIDTH_UNIT = 0x0A, // 10ms, range: 0 - 200ms
+        CST816X_SET_PULSE_WIDTH_UNIT = 0x0F, // 1.5ms, range: 0 - 200ms
 };
 
 enum cst816x_registers {
