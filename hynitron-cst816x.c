@@ -416,7 +416,7 @@ static struct i2c_driver cst816x_driver = {
 		.pm = pm_sleep_ptr(&cst816x_pm_ops),
 	},
 	.id_table = cst816x_id,
-	.probe = cst816x_probe
+	.probe = cst816x_probe,
 };
 
 module_i2c_driver(cst816x_driver);
