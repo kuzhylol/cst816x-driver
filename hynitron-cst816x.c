@@ -309,13 +309,14 @@ static int cst816x_suspend(struct device *dev)
 static int cst816x_resume(struct device *dev)
 {
 	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
+	int rc;
 
 	cst816x_reset(priv);
-	cst816x_setup_regs(priv);
+	rc = cst816x_setup_regs(priv);
+	if (!rc)
+		enable_irq(priv->irq);
 
-	enable_irq(priv->irq);
-
-	return 0;
+	return rc;
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
