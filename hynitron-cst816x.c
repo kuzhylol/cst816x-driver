@@ -196,8 +196,8 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 		raw = priv->rxtx;
 
 		priv->info.gesture = raw[0];
-		priv->info.x = ((raw[2] & 0x0f) << 8) + raw[3];
-		priv->info.y = ((raw[4] & 0x0f) << 8) + raw[5];
+		priv->info.x = ((raw[2] & 0x0F) << 8) | raw[3];
+		priv->info.y = ((raw[4] & 0x0F) << 8) | raw[5];
 
 		dev_dbg(priv->dev, "x: %d, y: %d, gesture: 0x%x\n",
 			priv->info.x, priv->info.y, priv->info.gesture);
