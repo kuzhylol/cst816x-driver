@@ -311,9 +311,9 @@ static int cst816x_suspend(struct device *dev)
 {
         struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
-        flush_work(&priv->work);
-        disable_irq(priv->irq);
-        del_timer_sync(&priv->timer);
+	disable_irq(priv->irq);
+	del_timer_sync(&priv->timer);
+	flush_work(&priv->work);
 
         return cst816x_i2c_reg_write(priv, CST816X_STANDBY,
                                      CST816X_SET_STANDBY_MODE);
