@@ -363,13 +363,11 @@ static int cst816x_probe(struct i2c_client *client,
 	if (client->irq <= 0) {
 		rc = -EINVAL;
 		dev_err(dev, "get parent IRQ err: %d\n", rc);
-
 		goto destroy_wq;
 	}
 
 	if (client->irq <= 0) {
 		dev_err(dev, "IRQ pin is missing\n");
-
 		goto free_input;
 	}
 
