@@ -358,7 +358,7 @@ static int cst816x_probe(struct i2c_client *client,
 		cst816x_reset(priv);
 
 	rc = cst816x_setup_regs(priv);
-	if (rc < 0)
+	if (rc)
 		goto destroy_wq;
 
 	rc = cst816x_register_input(priv);
