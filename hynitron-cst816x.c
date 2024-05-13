@@ -218,7 +218,6 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	if (!priv->input) {
 		rc = -ENOMEM;
 		dev_err(priv->dev, "input device alloc err: %d\n", rc);
-
 		goto err;
 	}
 
@@ -240,7 +239,6 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	rc = input_register_device(priv->input);
 	if (rc) {
 		dev_err(priv->dev, "input registration err: %d\n", rc);
-
 		goto err;
 	}
 err:
@@ -333,7 +331,6 @@ static int cst816x_probe(struct i2c_client *client,
 	if (!priv) {
 		rc = -ENOMEM;
 		dev_err(dev, "devm alloc failed: %d\n", rc);
-
 		goto err;
 	}
 
@@ -341,7 +338,6 @@ static int cst816x_probe(struct i2c_client *client,
 	if (!priv->wq) {
 		rc = -ENOMEM;
 		dev_err(dev, "workqueue alloc failed: %d\n", rc);
-
 		goto err;
 	}
 
@@ -356,7 +352,6 @@ static int cst816x_probe(struct i2c_client *client,
 	if (priv->reset == NULL) {
 		rc = -EIO;
 		dev_err(dev, "reset GPIO request failed\n");
-
 		goto destroy_wq;
 	}
 
