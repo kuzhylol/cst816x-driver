@@ -255,7 +255,7 @@ static void cst816x_reset(struct cst816x_priv *priv)
 	msleep(20);
 }
 
-static void cst816x_release_cb(struct timer_list *timer)
+static void cst816x_timer_cb(struct timer_list *timer)
 {
 	struct cst816x_priv *priv = from_timer(priv, timer, timer);
 
@@ -267,7 +267,7 @@ static void cst816x_release_cb(struct timer_list *timer)
 	mutex_unlock(&priv->lock);
 }
 
-static void wq_cb(struct work_struct *work)
+static void cst816x_wq_cb(struct work_struct *work)
 {
 	struct cst816x_priv *priv =
 		container_of(work, struct cst816x_priv, work);
@@ -346,8 +346,8 @@ static int cst816x_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&priv->lock);
-	INIT_WORK(&priv->work, wq_cb);
-	timer_setup(&priv->timer, cst816x_release_cb, 0);
+	INIT_WORK(&priv->work, cst816x_wq_cb);
+	timer_setup(&priv->timer, cst816x_timer_cb, 0);
 
 	priv->dev = dev;
 	priv->client = client;
