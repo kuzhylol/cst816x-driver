@@ -63,7 +63,7 @@ struct cst816x_priv {
 	struct input_dev *input;
 	struct mutex lock;
 	struct timer_list timer;
-	struct work_struct work;
+	struct delayed_work dw;
 	struct cst816x_info info;
 
 	u8 rxtx[8];
@@ -173,7 +173,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 {
 	const struct cst816x_gesture_mapping *mapping = NULL;
 
-	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
 			mapping = &cst816x_gesture_map[i];
 			break;
@@ -255,18 +255,14 @@ static void cst816x_timer_cb(struct timer_list *timer)
 {
 	struct cst816x_priv *priv = from_timer(priv, timer, timer);
 
-	mutex_lock(&priv->lock);
-
 	report_gesture_event(priv, priv->info.gesture, false);
 	input_sync(priv->input);
-
-	mutex_unlock(&priv->lock);
 }
 
-static void cst816x_wq_cb(struct work_struct *work)
+static void cst816x_dw_cb(struct work_struct *work)
 {
 	struct cst816x_priv *priv =
-		container_of(work, struct cst816x_priv, work);
+		container_of(work, struct cst816x_priv, dw.work);
 
 	mutex_lock(&priv->lock);
 
@@ -275,19 +271,19 @@ static void cst816x_wq_cb(struct work_struct *work)
 		input_report_abs(priv->input, ABS_Y, priv->info.y);
 		report_gesture_event(priv, priv->info.gesture, true);
 		input_sync(priv->input);
+
+		mod_timer(&priv->timer,
+			  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
 	}
 
 	mutex_unlock(&priv->lock);
-
-	mod_timer(&priv->timer,
-		  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
 }
 
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
 	struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
 
-	queue_work(priv->wq, &priv->work);
+	schedule_delayed_work(&priv->dw, 0);
 
 	return IRQ_HANDLED;
 }
@@ -298,7 +294,7 @@ static int cst816x_suspend(struct device *dev)
 
 	disable_irq(priv->irq);
 	del_timer_sync(&priv->timer);
-	flush_work(&priv->work);
+	flush_delayed_work(&priv->dw);
 
 	return cst816x_i2c_reg_write(priv, CST816X_STANDBY,
 				     CST816X_SET_STANDBY_MODE);
@@ -341,7 +337,7 @@ static int cst816x_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&priv->lock);
-	INIT_WORK(&priv->work, cst816x_wq_cb);
+	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
 
 	priv->dev = dev;
