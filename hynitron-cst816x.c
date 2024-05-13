@@ -287,7 +287,7 @@ static void cst816x_wq_cb(struct work_struct *work)
 		  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
 }
 
-static irqreturn_t cst815s_irq_cb(int irq, void *cookie)
+static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
 	struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
 
@@ -386,7 +386,7 @@ static int cst816x_probe(struct i2c_client *client,
 	}
 
 	rc = devm_request_threaded_irq(dev, client->irq, NULL,
-				       cst815s_irq_cb,
+				       cst816x_irq_cb,
 				       IRQF_ONESHOT | IRQF_NO_AUTOEN,
 				       dev->driver->name, priv);
 	if (!rc) {
