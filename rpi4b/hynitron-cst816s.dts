@@ -6,7 +6,7 @@
         target = <&i2c>;
         __overlay__ {
             cst816s: cst816s@15 {
-                compatible = "cst,cst816s";
+                compatible = "hynitron,cst816s";
                 reg = <0x15>;
                 interrupt-parent = <&gpio>;
                 interrupts = <4 1>; /* IRQF_TRIGGER_RISING */
