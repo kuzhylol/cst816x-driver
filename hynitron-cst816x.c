@@ -131,10 +131,8 @@ static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
 	xfer[1].buf = priv->rxtx;
 
 	rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
-	if (rc < 0) {
-		rc = -EIO;
+	if (rc < 0)
 		dev_err(&client->dev, "i2c rx err: %d\n", rc);
-	}
 
 	return rc == ARRAY_SIZE(xfer) ? 0 : -EIO;
 }
