@@ -182,8 +182,6 @@ static void report_gesture_event(struct cst816x_priv *priv,
 
 	if (mapping)
 		input_report_key(priv->input, mapping->event_code, state);
-	else
-		dev_warn(priv->dev, "unknown gesture: %d\n", gesture_id);
 }
 
 static int cst816x_process_touch(struct cst816x_priv *priv)
