@@ -244,9 +244,9 @@ err:
 static void cst816x_reset(struct cst816x_priv *priv)
 {
 	gpiod_set_value_cansleep(priv->reset, 0);
-	msleep(20);
+	msleep(100);
 	gpiod_set_value_cansleep(priv->reset, 1);
-	msleep(20);
+	msleep(100);
 }
 
 static void cst816x_timer_cb(struct timer_list *timer)
