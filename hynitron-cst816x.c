@@ -173,7 +173,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 {
 	const struct cst816x_gesture_mapping *mapping = NULL;
 
-	for (uint8_t i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
 			mapping = &cst816x_gesture_map[i];
 			break;
@@ -224,7 +224,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (uint8_t i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		input_set_capability(priv->input, EV_KEY,
 				     cst816x_gesture_map[i].event_code);
 	}
