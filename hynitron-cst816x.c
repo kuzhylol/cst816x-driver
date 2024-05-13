@@ -171,17 +171,17 @@ static void report_gesture_event(struct cst816x_priv *priv,
 				 enum cst816_gesture_id gesture_id,
 				 bool state)
 {
-	const struct cst816x_gesture_mapping *mapping = NULL;
+	const struct cst816x_gesture_mapping *lookup = NULL;
 
 	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
-			mapping = &cst816x_gesture_map[i];
+			lookup = &cst816x_gesture_map[i];
 			break;
 		}
 	}
 
-	if (mapping)
-		input_report_key(priv->input, mapping->event_code, state);
+	if (lookup)
+		input_report_key(priv->input, lookup->event_code, state);
 }
 
 static int cst816x_process_touch(struct cst816x_priv *priv)
