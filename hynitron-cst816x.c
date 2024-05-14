@@ -5,11 +5,11 @@
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
  #include <linux/module.h>
- #include <linux/i2c.h>
+ #include <linux/delay.h>
  #include <linux/gpio.h>
+ #include <linux/i2c.h>
  #include <linux/input.h>
  #include <linux/interrupt.h>
- #include <linux/delay.h>
  #include <linux/of_irq.h>
  #include <linux/timer.h>
 
