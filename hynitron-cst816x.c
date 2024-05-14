@@ -50,9 +50,9 @@ enum cst816_gesture_id {
 };
 
 struct cst816x_info {
-	uint8_t gesture;
-	uint8_t x;
-	uint8_t y;
+	u8 gesture;
+	u8 x;
+	u8 y;
 };
 
 struct cst816x_priv {
@@ -186,7 +186,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 
 static int cst816x_process_touch(struct cst816x_priv *priv)
 {
-	uint8_t *raw;
+	u8 *raw;
 	int rc;
 
 	rc = cst816x_i2c_reg_read(priv, CST816X_FRAME);
