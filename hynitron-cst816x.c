@@ -19,27 +19,18 @@
 
 enum cst816x_commands {
 	CST816X_SET_DOUBLE_TAP = 0x01,
-	CST816X_SET_UP_DOWN_SWIPE = 0x02,
-	CST816X_SET_LEFT_RIGHT_SWIPE = 0x04,
 	CST816X_SET_STANDBY_MODE = 0x03,
 	CST816X_SET_GESTURE_MODE = 0x41,
-	CST816X_SET_POINT_MODE = 0x71,
-	CST816X_SET_MIXED_MODE = 0x11,
-	CST816X_SET_CYCLE_UNIT = 0x01, // 0.1ms, range: 1 - 30ms
-	CST816X_SET_PULSE_WIDTH_UNIT = 0x0F, // 1.5ms, range: 0 - 200ms
 };
 
 enum cst816x_registers {
 	CST816X_FRAME = 0x01,
 	CST816X_MOTION = 0xEC,
 	CST816X_STANDBY = 0xA5,
-	CST816X_IRQCTL = 0xFA,
-	CST816X_CYCLE = 0xEE,
-	CST816X_PULSE_WIDTH = 0xED,
 };
 
 enum cst816_gesture_id {
-	CST816X_NONE = 0x00,
+	CST816X_SWIPE = 0x00,
 	CST816X_SWIPE_UP = 0x01,
 	CST816X_SWIPE_DOWN = 0x02,
 	CST816X_SWIPE_LEFT = 0x03,
@@ -76,7 +67,7 @@ struct cst816x_gesture_mapping {
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-	{CST816X_NONE, KEY_UNKNOWN},
+	{CST816X_SWIPE, BTN_WHEEL},
 	{CST816X_SWIPE_UP, KEY_UP},
 	{CST816X_SWIPE_DOWN, KEY_DOWN},
 	{CST816X_SWIPE_LEFT, KEY_LEFT},
@@ -86,7 +77,7 @@ static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
 	{CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
-static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
+static int cst816x_i2c_write_reg(struct cst816x_priv *priv, u8 reg, u8 cmd)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer;
@@ -116,7 +107,7 @@ static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
 	return rc;
 }
 
-static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
+static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer[2];
@@ -148,28 +139,11 @@ static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
 	return rc;
 }
 
-static int cst816x_setup_regs(struct cst816x_priv *priv)
+static int cst816x_regs_setup(struct cst816x_priv *priv)
 {
 	int rc;
 
-	rc = cst816x_i2c_reg_write(priv, CST816X_IRQCTL, CST816X_SET_MIXED_MODE);
-	if (rc < 0)
-		goto err;
-
-	rc = cst816x_i2c_reg_write(priv, CST816X_CYCLE, CST816X_SET_CYCLE_UNIT);
-	if (rc < 0)
-		goto err;
-
-	rc = cst816x_i2c_reg_write(priv, CST816X_PULSE_WIDTH,
-				   CST816X_SET_PULSE_WIDTH_UNIT);
-	if (rc < 0)
-		goto err;
-
-	rc = cst816x_i2c_reg_write(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
-	if (rc < 0)
-		goto err;
-
-err:
+	rc = cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
 	if (rc < 0)
 		dev_err(priv->dev, "register setup err: %d\n", rc);
 	else
@@ -184,7 +158,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 {
 	const struct cst816x_gesture_mapping *lookup = NULL;
 
-	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
 			lookup = &cst816x_gesture_map[i];
 			break;
@@ -200,7 +174,7 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 	u8 *raw;
 	int rc;
 
-	rc = cst816x_i2c_reg_read(priv, CST816X_FRAME);
+	rc = cst816x_i2c_read_reg(priv, CST816X_FRAME);
 	if (!rc) {
 		raw = priv->rxtx;
 
@@ -305,7 +279,7 @@ static int cst816x_suspend(struct device *dev)
 	del_timer_sync(&priv->timer);
 	flush_delayed_work(&priv->dw);
 
-	return cst816x_i2c_reg_write(priv, CST816X_STANDBY,
+	return cst816x_i2c_write_reg(priv, CST816X_STANDBY,
 				     CST816X_SET_STANDBY_MODE);
 }
 
@@ -315,7 +289,7 @@ static int cst816x_resume(struct device *dev)
 	int rc;
 
 	cst816x_reset(priv);
-	rc = cst816x_setup_regs(priv);
+	rc = cst816x_regs_setup(priv);
 	if (!rc)
 		enable_irq(priv->irq);
 
@@ -355,7 +329,7 @@ static int cst816x_probe(struct i2c_client *client,
 	if (priv->reset)
 		cst816x_reset(priv);
 
-	rc = cst816x_setup_regs(priv);
+	rc = cst816x_regs_setup(priv);
 	if (rc)
 		goto err;
 
