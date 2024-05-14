@@ -5,11 +5,11 @@
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
  #include <linux/module.h>
- #include <linux/i2c.h>
+ #include <linux/delay.h>
  #include <linux/gpio.h>
+ #include <linux/i2c.h>
  #include <linux/input.h>
  #include <linux/interrupt.h>
- #include <linux/delay.h>
  #include <linux/of_irq.h>
  #include <linux/timer.h>
 
@@ -50,16 +50,15 @@ enum cst816_gesture_id {
 };
 
 struct cst816x_info {
-	uint8_t gesture;
-	uint8_t x;
-	uint8_t y;
+	u8 gesture;
+	u8 x;
+	u8 y;
 };
 
 struct cst816x_priv {
 	struct device *dev;
 	struct i2c_client *client;
 	struct gpio_desc *reset;
-	struct workqueue_struct *wq;
 	struct input_dev *input;
 	struct mutex lock;
 	struct timer_list timer;
@@ -73,7 +72,7 @@ struct cst816x_priv {
 
 struct cst816x_gesture_mapping {
 	enum cst816_gesture_id gesture_id;
-	int event_code;
+	size_t event_code;
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
@@ -104,10 +103,15 @@ static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
 	xfer.buf = priv->rxtx;
 
 	rc = i2c_transfer(client->adapter, &xfer, 1);
-	if (rc < 0) {
-		rc = -EIO;
-		dev_err(&client->dev, "i2c tx err: %d\n", rc);
+	if (rc != 1) {
+		if (rc >= 0)
+			rc = -EIO;
+	} else {
+		rc = 0;
 	}
+
+	if (rc < 0)
+		dev_err(&client->dev, "i2c tx err: %d\n", rc);
 
 	return rc;
 }
@@ -131,10 +135,17 @@ static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
 	xfer[1].buf = priv->rxtx;
 
 	rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
+	if (rc != ARRAY_SIZE(xfer)) {
+		if (rc >= 0)
+			rc = -EIO;
+	} else {
+		rc = 0;
+	}
+
 	if (rc < 0)
 		dev_err(&client->dev, "i2c rx err: %d\n", rc);
 
-	return rc == ARRAY_SIZE(xfer) ? 0 : -EIO;
+	return rc;
 }
 
 static int cst816x_setup_regs(struct cst816x_priv *priv)
@@ -171,24 +182,22 @@ static void report_gesture_event(struct cst816x_priv *priv,
 				 enum cst816_gesture_id gesture_id,
 				 bool state)
 {
-	const struct cst816x_gesture_mapping *mapping = NULL;
+	const struct cst816x_gesture_mapping *lookup = NULL;
 
 	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
-			mapping = &cst816x_gesture_map[i];
+			lookup = &cst816x_gesture_map[i];
 			break;
 		}
 	}
 
-	if (mapping)
-		input_report_key(priv->input, mapping->event_code, state);
-	else
-		dev_warn(priv->dev, "unknown gesture: %d\n", gesture_id);
+	if (lookup)
+		input_report_key(priv->input, lookup->event_code, state);
 }
 
 static int cst816x_process_touch(struct cst816x_priv *priv)
 {
-	uint8_t *raw;
+	u8 *raw;
 	int rc;
 
 	rc = cst816x_i2c_reg_read(priv, CST816X_FRAME);
@@ -246,9 +255,9 @@ err:
 static void cst816x_reset(struct cst816x_priv *priv)
 {
 	gpiod_set_value_cansleep(priv->reset, 0);
-	msleep(20);
+	msleep(100);
 	gpiod_set_value_cansleep(priv->reset, 1);
-	msleep(20);
+	msleep(100);
 }
 
 static void cst816x_timer_cb(struct timer_list *timer)
@@ -329,16 +338,9 @@ static int cst816x_probe(struct i2c_client *client,
 		goto err;
 	}
 
-	priv->wq = create_workqueue("cst816x-wq");
-	if (!priv->wq) {
-		rc = -ENOMEM;
-		dev_err(dev, "workqueue alloc failed: %d\n", rc);
-		goto err;
-	}
-
-	mutex_init(&priv->lock);
 	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
+	mutex_init(&priv->lock);
 
 	priv->dev = dev;
 	priv->client = client;
@@ -347,7 +349,7 @@ static int cst816x_probe(struct i2c_client *client,
 	if (priv->reset == NULL) {
 		rc = -EIO;
 		dev_err(dev, "reset GPIO request failed\n");
-		goto destroy_wq;
+		goto err;
 	}
 
 	if (priv->reset)
@@ -355,24 +357,22 @@ static int cst816x_probe(struct i2c_client *client,
 
 	rc = cst816x_setup_regs(priv);
 	if (rc)
-		goto destroy_wq;
+		goto err;
 
 	rc = cst816x_register_input(priv);
 	if (rc)
-		goto destroy_wq;
+		goto err;
 
 	client->irq = of_irq_get(dev->of_node, 0);
 	if (client->irq <= 0) {
 		rc = -EINVAL;
 		dev_err(dev, "get parent IRQ err: %d\n", rc);
-
-		goto destroy_wq;
+		goto destroy_input;
 	}
 
 	if (client->irq <= 0) {
 		dev_err(dev, "IRQ pin is missing\n");
-
-		goto free_input;
+		goto destroy_input;
 	}
 
 	rc = devm_request_threaded_irq(dev, client->irq, NULL,
@@ -386,13 +386,10 @@ static int cst816x_probe(struct i2c_client *client,
 		dev_err(dev, "IRQ probe err: %d\n", client->irq);
 	}
 
-free_input:
+destroy_input:
 	if (rc)
-		input_free_device(priv->input);
+		input_unregister_device(priv->input);
 
-destroy_wq:
-	if (rc)
-		destroy_workqueue(priv->wq);
 err:
 	return rc;
 }
