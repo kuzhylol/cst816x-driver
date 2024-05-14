@@ -77,7 +77,7 @@ static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
 	{CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
-static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
+static int cst816x_i2c_write_reg(struct cst816x_priv *priv, u8 reg, u8 cmd)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer;
@@ -107,7 +107,7 @@ static int cst816x_i2c_reg_write(struct cst816x_priv *priv, u8 reg, u8 cmd)
 	return rc;
 }
 
-static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
+static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer[2];
@@ -139,11 +139,11 @@ static int cst816x_i2c_reg_read(struct cst816x_priv *priv, u8 reg)
 	return rc;
 }
 
-static int cst816x_setup_regs(struct cst816x_priv *priv)
+static int cst816x_regs_setup(struct cst816x_priv *priv)
 {
 	int rc;
 
-	rc = cst816x_i2c_reg_write(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
+	rc = cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
 	if (rc < 0)
 		dev_err(priv->dev, "register setup err: %d\n", rc);
 	else
@@ -174,7 +174,7 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 	u8 *raw;
 	int rc;
 
-	rc = cst816x_i2c_reg_read(priv, CST816X_FRAME);
+	rc = cst816x_i2c_read_reg(priv, CST816X_FRAME);
 	if (!rc) {
 		raw = priv->rxtx;
 
@@ -279,7 +279,7 @@ static int cst816x_suspend(struct device *dev)
 	del_timer_sync(&priv->timer);
 	flush_delayed_work(&priv->dw);
 
-	return cst816x_i2c_reg_write(priv, CST816X_STANDBY,
+	return cst816x_i2c_write_reg(priv, CST816X_STANDBY,
 				     CST816X_SET_STANDBY_MODE);
 }
 
@@ -289,7 +289,7 @@ static int cst816x_resume(struct device *dev)
 	int rc;
 
 	cst816x_reset(priv);
-	rc = cst816x_setup_regs(priv);
+	rc = cst816x_regs_setup(priv);
 	if (!rc)
 		enable_irq(priv->irq);
 
@@ -329,7 +329,7 @@ static int cst816x_probe(struct i2c_client *client,
 	if (priv->reset)
 		cst816x_reset(priv);
 
-	rc = cst816x_setup_regs(priv);
+	rc = cst816x_regs_setup(priv);
 	if (rc)
 		goto err;
 
