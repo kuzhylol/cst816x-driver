@@ -72,7 +72,7 @@ struct cst816x_priv {
 
 struct cst816x_gesture_mapping {
 	enum cst816_gesture_id gesture_id;
-	int event_code;
+	size_t event_code;
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
