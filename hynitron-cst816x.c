@@ -19,23 +19,14 @@
 
 enum cst816x_commands {
 	CST816X_SET_DOUBLE_TAP = 0x01,
-	CST816X_SET_UP_DOWN_SWIPE = 0x02,
-	CST816X_SET_LEFT_RIGHT_SWIPE = 0x04,
 	CST816X_SET_STANDBY_MODE = 0x03,
 	CST816X_SET_GESTURE_MODE = 0x41,
-	CST816X_SET_POINT_MODE = 0x71,
-	CST816X_SET_MIXED_MODE = 0x11,
-	CST816X_SET_CYCLE_UNIT = 0x01, // 0.1ms, range: 1 - 30ms
-	CST816X_SET_PULSE_WIDTH_UNIT = 0x0F, // 1.5ms, range: 0 - 200ms
 };
 
 enum cst816x_registers {
 	CST816X_FRAME = 0x01,
 	CST816X_MOTION = 0xEC,
 	CST816X_STANDBY = 0xA5,
-	CST816X_IRQCTL = 0xFA,
-	CST816X_CYCLE = 0xEE,
-	CST816X_PULSE_WIDTH = 0xED,
 };
 
 enum cst816_gesture_id {
@@ -152,24 +143,7 @@ static int cst816x_setup_regs(struct cst816x_priv *priv)
 {
 	int rc;
 
-	rc = cst816x_i2c_reg_write(priv, CST816X_IRQCTL, CST816X_SET_MIXED_MODE);
-	if (rc < 0)
-		goto err;
-
-	rc = cst816x_i2c_reg_write(priv, CST816X_CYCLE, CST816X_SET_CYCLE_UNIT);
-	if (rc < 0)
-		goto err;
-
-	rc = cst816x_i2c_reg_write(priv, CST816X_PULSE_WIDTH,
-				   CST816X_SET_PULSE_WIDTH_UNIT);
-	if (rc < 0)
-		goto err;
-
 	rc = cst816x_i2c_reg_write(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
-	if (rc < 0)
-		goto err;
-
-err:
 	if (rc < 0)
 		dev_err(priv->dev, "register setup err: %d\n", rc);
 	else
@@ -184,7 +158,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 {
 	const struct cst816x_gesture_mapping *lookup = NULL;
 
-	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
 			lookup = &cst816x_gesture_map[i];
 			break;
