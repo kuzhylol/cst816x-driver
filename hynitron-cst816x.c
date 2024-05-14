@@ -30,7 +30,7 @@ enum cst816x_registers {
 };
 
 enum cst816_gesture_id {
-	CST816X_NONE = 0x00,
+	CST816X_SWIPE = 0x00,
 	CST816X_SWIPE_UP = 0x01,
 	CST816X_SWIPE_DOWN = 0x02,
 	CST816X_SWIPE_LEFT = 0x03,
@@ -67,7 +67,7 @@ struct cst816x_gesture_mapping {
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-	{CST816X_NONE, KEY_UNKNOWN},
+	{CST816X_SWIPE, BTN_WHEEL},
 	{CST816X_SWIPE_UP, KEY_UP},
 	{CST816X_SWIPE_DOWN, KEY_DOWN},
 	{CST816X_SWIPE_LEFT, KEY_LEFT},
