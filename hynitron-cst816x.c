@@ -158,7 +158,7 @@ static void report_gesture_event(struct cst816x_priv *priv,
 {
 	const struct cst816x_gesture_mapping *lookup = NULL;
 
-	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
 			lookup = &cst816x_gesture_map[i];
 			break;
