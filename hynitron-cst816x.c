@@ -338,9 +338,9 @@ static int cst816x_probe(struct i2c_client *client,
 		goto err;
 	}
 
-	mutex_init(&priv->lock);
 	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
+	mutex_init(&priv->lock);
 
 	priv->dev = dev;
 	priv->client = client;
