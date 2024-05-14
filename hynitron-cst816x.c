@@ -59,7 +59,6 @@ struct cst816x_priv {
 	struct device *dev;
 	struct i2c_client *client;
 	struct gpio_desc *reset;
-	struct workqueue_struct *wq;
 	struct input_dev *input;
 	struct mutex lock;
 	struct timer_list timer;
@@ -327,13 +326,6 @@ static int cst816x_probe(struct i2c_client *client,
 		goto err;
 	}
 
-	priv->wq = create_workqueue("cst816x-wq");
-	if (!priv->wq) {
-		rc = -ENOMEM;
-		dev_err(dev, "workqueue alloc failed: %d\n", rc);
-		goto err;
-	}
-
 	mutex_init(&priv->lock);
 	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
@@ -345,7 +337,7 @@ static int cst816x_probe(struct i2c_client *client,
 	if (priv->reset == NULL) {
 		rc = -EIO;
 		dev_err(dev, "reset GPIO request failed\n");
-		goto destroy_wq;
+		goto err;
 	}
 
 	if (priv->reset)
@@ -353,22 +345,22 @@ static int cst816x_probe(struct i2c_client *client,
 
 	rc = cst816x_setup_regs(priv);
 	if (rc)
-		goto destroy_wq;
+		goto err;
 
 	rc = cst816x_register_input(priv);
 	if (rc)
-		goto destroy_wq;
+		goto err;
 
 	client->irq = of_irq_get(dev->of_node, 0);
 	if (client->irq <= 0) {
 		rc = -EINVAL;
 		dev_err(dev, "get parent IRQ err: %d\n", rc);
-		goto destroy_wq;
+		goto destroy_input;
 	}
 
 	if (client->irq <= 0) {
 		dev_err(dev, "IRQ pin is missing\n");
-		goto free_input;
+		goto destroy_input;
 	}
 
 	rc = devm_request_threaded_irq(dev, client->irq, NULL,
@@ -382,13 +374,10 @@ static int cst816x_probe(struct i2c_client *client,
 		dev_err(dev, "IRQ probe err: %d\n", client->irq);
 	}
 
-free_input:
+destroy_input:
 	if (rc)
-		input_free_device(priv->input);
+		input_unregister_device(priv->input);
 
-destroy_wq:
-	if (rc)
-		destroy_workqueue(priv->wq);
 err:
 	return rc;
 }
