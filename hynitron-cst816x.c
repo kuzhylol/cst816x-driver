@@ -28,7 +28,7 @@ enum cst816x_registers {
 	CST816X_STANDBY = 0xA5,
 };
 
-enum cst816_gesture_id {
+enum cst816_gesture_code {
 	CST816X_SWIPE = 0x00,
 	CST816X_SWIPE_UP = 0x01,
 	CST816X_SWIPE_DOWN = 0x02,
@@ -60,7 +60,7 @@ struct cst816x_priv {
 };
 
 struct cst816x_gesture_mapping {
-	enum cst816_gesture_id gesture_id;
+	enum cst816_gesture_code gesture_code;
 	size_t event_code;
 };
 
@@ -151,13 +151,13 @@ static int cst816x_regs_setup(struct cst816x_priv *priv)
 }
 
 static void report_gesture_event(struct cst816x_priv *priv,
-				 enum cst816_gesture_id gesture_id,
+				 enum cst816_gesture_code gesture_code,
 				 bool state)
 {
 	const struct cst816x_gesture_mapping *lookup = NULL;
 
 	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
-		if (cst816x_gesture_map[i].gesture_id == gesture_id) {
+		if (cst816x_gesture_map[i].gesture_code == gesture_code) {
 			lookup = &cst816x_gesture_map[i];
 			break;
 		}
