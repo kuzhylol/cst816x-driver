@@ -4,18 +4,19 @@
  *
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
- #include <linux/module.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/of_irq.h>
- #include <linux/timer.h>
+#include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/i2c.h>
+#include <linux/input.h>
+#include <linux/interrupt.h>
+#include <linux/of_irq.h>
+#include <linux/timer.h>
 
- #define CST816X_MAX_X 240
- #define CST816X_MAX_Y CST816X_MAX_X
- #define CST816X_EVENT_TIMEOUT_MS 50
+#define CST816X_MAX_X 240
+#define CST816X_MAX_Y CST816X_MAX_X
+#define CST816X_EVENT_TIMEOUT_MS 50
 
 enum cst816x_commands {
 	CST816X_SET_DOUBLE_TAP = 0x01,
