@@ -20,7 +20,6 @@
 enum cst816x_commands {
 	CST816X_SET_DOUBLE_TAP = 0x01,
 	CST816X_SET_STANDBY_MODE = 0x03,
-	CST816X_SET_GESTURE_MODE = 0x41,
 };
 
 enum cst816x_registers {
