@@ -50,7 +50,6 @@ struct cst816x_priv {
 	struct i2c_client *client;
 	struct gpio_desc *reset;
 	struct input_dev *input;
-	struct mutex lock;
 	struct timer_list timer;
 	struct delayed_work dw;
 	struct cst816x_info info;
@@ -246,8 +245,6 @@ static void cst816x_dw_cb(struct work_struct *work)
 	struct cst816x_priv *priv =
 		container_of(work, struct cst816x_priv, dw.work);
 
-	mutex_lock(&priv->lock);
-
 	if (!cst816x_process_touch(priv)) {
 		input_report_abs(priv->input, ABS_X, priv->info.x);
 		input_report_abs(priv->input, ABS_Y, priv->info.y);
@@ -257,8 +254,6 @@ static void cst816x_dw_cb(struct work_struct *work)
 		mod_timer(&priv->timer,
 			  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
 	}
-
-	mutex_unlock(&priv->lock);
 }
 
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
@@ -313,7 +308,6 @@ static int cst816x_probe(struct i2c_client *client,
 
 	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
-	mutex_init(&priv->lock);
 
 	priv->dev = dev;
 	priv->client = client;
