@@ -293,8 +293,7 @@ static int cst816x_resume(struct device *dev)
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
 
-static int cst816x_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+static int cst816x_probe(struct i2c_client *client)
 {
 	struct cst816x_priv *priv;
 	struct device *dev = &client->dev;
