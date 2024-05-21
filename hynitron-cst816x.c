@@ -276,11 +276,11 @@ static int cst816x_probe(struct i2c_client *client)
 	if (!priv)
 		return -ENOMEM;
 
-	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
-	timer_setup(&priv->timer, cst816x_timer_cb, 0);
-
 	priv->dev = dev;
 	priv->client = client;
+
+	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
+	timer_setup(&priv->timer, cst816x_timer_cb, 0);
 
 	priv->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->reset))
