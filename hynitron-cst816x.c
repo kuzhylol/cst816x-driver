@@ -173,8 +173,6 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 
 		dev_dbg(priv->dev, "x: %d, y: %d, gesture: 0x%x\n",
 			priv->info.x, priv->info.y, priv->info.gesture);
-	} else {
-		dev_warn(priv->dev, "request was dropped\n");
 	}
 
 	return rc;
