@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Driver for I2C connected CST816X touchsreen
+ * Driver for I2C connected Hynitron CST816X Touchscreen
  *
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
- #include <linux/module.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/of_irq.h>
- #include <linux/timer.h>
+#include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/i2c.h>
+#include <linux/input.h>
+#include <linux/interrupt.h>
+#include <linux/of_irq.h>
+#include <linux/timer.h>
 
- #define CST816X_MAX_X 240
- #define CST816X_MAX_Y CST816X_MAX_X
- #define CST816X_EVENT_TIMEOUT_MS 50
+#define CST816X_MAX_X 240
+#define CST816X_MAX_Y CST816X_MAX_X
+
+#define CST816X_EVENT_TIMEOUT_MS 10
 
 enum cst816x_commands {
 	CST816X_SET_DOUBLE_TAP = 0x01,
@@ -55,8 +57,6 @@ struct cst816x_priv {
 	struct cst816x_info info;
 
 	u8 rxtx[8];
-
-	int irq;
 };
 
 struct cst816x_gesture_mapping {
@@ -65,7 +65,7 @@ struct cst816x_gesture_mapping {
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-	{CST816X_SWIPE, BTN_WHEEL},
+	{CST816X_SWIPE, KEY_UNKNOWN},
 	{CST816X_SWIPE_UP, KEY_UP},
 	{CST816X_SWIPE_DOWN, KEY_DOWN},
 	{CST816X_SWIPE_LEFT, KEY_LEFT},
@@ -137,17 +137,9 @@ static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 	return rc;
 }
 
-static int cst816x_regs_setup(struct cst816x_priv *priv)
+static int cst816x_setup_regs(struct cst816x_priv *priv)
 {
-	int rc;
-
-	rc = cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
-	if (rc < 0)
-		dev_err(priv->dev, "register setup err: %d\n", rc);
-	else
-		rc = 0;
-
-	return rc;
+	return cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
 }
 
 static void report_gesture_event(struct cst816x_priv *priv,
@@ -182,8 +174,6 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 
 		dev_dbg(priv->dev, "x: %d, y: %d, gesture: 0x%x\n",
 			priv->info.x, priv->info.y, priv->info.gesture);
-	} else {
-		dev_warn(priv->dev, "request was dropped\n");
 	}
 
 	return rc;
@@ -191,21 +181,16 @@ static int cst816x_process_touch(struct cst816x_priv *priv)
 
 static int cst816x_register_input(struct cst816x_priv *priv)
 {
-	int rc;
-
 	priv->input = devm_input_allocate_device(priv->dev);
-	if (!priv->input) {
-		rc = -ENOMEM;
-		dev_err(priv->dev, "input device alloc err: %d\n", rc);
-		goto err;
-	}
+	if (!priv->input)
+		return -ENOMEM;
 
-	priv->input->name = "CST816X Touchscreen";
+	priv->input->name = "Hynitron CST816X Touchscreen";
 	priv->input->phys = "input/ts";
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		input_set_capability(priv->input, EV_KEY,
 				     cst816x_gesture_map[i].event_code);
 	}
@@ -215,13 +200,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	input_set_capability(priv->input, EV_ABS, ABS_X);
 	input_set_capability(priv->input, EV_ABS, ABS_Y);
 
-	rc = input_register_device(priv->input);
-	if (rc) {
-		dev_err(priv->dev, "input registration err: %d\n", rc);
-		goto err;
-	}
-err:
-	return rc;
+	return input_register_device(priv->input);
 }
 
 static void cst816x_reset(struct cst816x_priv *priv)
@@ -269,7 +248,6 @@ static int cst816x_suspend(struct device *dev)
 {
 	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
-	disable_irq(priv->irq);
 	del_timer_sync(&priv->timer);
 	flush_delayed_work(&priv->dw);
 
@@ -280,31 +258,23 @@ static int cst816x_suspend(struct device *dev)
 static int cst816x_resume(struct device *dev)
 {
 	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
-	int rc;
 
 	cst816x_reset(priv);
-	rc = cst816x_regs_setup(priv);
-	if (!rc)
-		enable_irq(priv->irq);
 
-	return rc;
+	return cst816x_setup_regs(priv);
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
 
-static int cst816x_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+static int cst816x_probe(struct i2c_client *client)
 {
 	struct cst816x_priv *priv;
 	struct device *dev = &client->dev;
 	int rc;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-	if (!priv) {
-		rc = -ENOMEM;
-		dev_err(dev, "devm alloc failed: %d\n", rc);
-		goto err;
-	}
+	if (!priv)
+		return -ENOMEM;
 
 	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
 	timer_setup(&priv->timer, cst816x_timer_cb, 0);
@@ -313,56 +283,31 @@ static int cst816x_probe(struct i2c_client *client,
 	priv->client = client;
 
 	priv->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-	if (priv->reset == NULL) {
-		rc = -EIO;
-		dev_err(dev, "reset GPIO request failed\n");
-		goto err;
-	}
+	if (IS_ERR(priv->reset))
+		return dev_err_probe(dev, PTR_ERR(priv->reset),
+				     "reset gpio not found\n");
 
 	if (priv->reset)
 		cst816x_reset(priv);
 
-	rc = cst816x_regs_setup(priv);
+	rc = cst816x_setup_regs(priv);
 	if (rc)
-		goto err;
-
-	rc = cst816x_register_input(priv);
-	if (rc)
-		goto err;
+		return dev_err_probe(dev, rc, "regs setup failed\n");
 
 	client->irq = of_irq_get(dev->of_node, 0);
-	if (client->irq <= 0) {
-		rc = -EINVAL;
-		dev_err(dev, "get parent IRQ err: %d\n", rc);
-		goto destroy_input;
-	}
+	if (client->irq <= 0)
+		return dev_err_probe(dev, client->irq, "irq lookup failed\n");
 
-	if (client->irq <= 0) {
-		dev_err(dev, "IRQ pin is missing\n");
-		goto destroy_input;
-	}
-
-	rc = devm_request_threaded_irq(dev, client->irq, NULL,
-				       cst816x_irq_cb,
-				       IRQF_ONESHOT | IRQF_NO_AUTOEN,
-				       dev->driver->name, priv);
-	if (!rc) {
-		priv->irq = client->irq;
-		enable_irq(priv->irq);
-	} else {
-		dev_err(dev, "IRQ probe err: %d\n", client->irq);
-	}
-
-destroy_input:
+	rc = devm_request_threaded_irq(dev, client->irq, NULL, cst816x_irq_cb,
+				       IRQF_ONESHOT, dev->driver->name, priv);
 	if (rc)
-		input_unregister_device(priv->input);
+		return dev_err_probe(dev, client->irq, "irq request failed\n");
 
-err:
-	return rc;
+	return cst816x_register_input(priv);
 }
 
 static const struct i2c_device_id cst816x_id[] = {
-	{ "cst816s", 0 },
+	{ .name = "cst816s", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, cst816x_id);
