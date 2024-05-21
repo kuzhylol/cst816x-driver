@@ -331,5 +331,5 @@ static struct i2c_driver cst816x_driver = {
 module_i2c_driver(cst816x_driver);
 
 MODULE_AUTHOR("Oleh Kuzhylnyi <kuzhylol@gmail.com>");
-MODULE_DESCRIPTION("CST816X Touchscreen Driver");
+MODULE_DESCRIPTION("Hynitron CST816X Touchscreen Driver");
 MODULE_LICENSE("GPL");
