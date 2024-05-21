@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Driver for I2C connected CST816X touchsreen
+ * Driver for I2C connected Hynitron CST816X Touchscreen
  *
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
@@ -16,6 +16,7 @@
 
 #define CST816X_MAX_X 240
 #define CST816X_MAX_Y CST816X_MAX_X
+
 #define CST816X_EVENT_TIMEOUT_MS 50
 
 enum cst816x_commands {
@@ -184,7 +185,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	if (!priv->input)
 		return -ENOMEM;
 
-	priv->input->name = "Hynitron cst816x Touchscreen";
+	priv->input->name = "Hynitron CST816X Touchscreen";
 	priv->input->phys = "input/ts";
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
