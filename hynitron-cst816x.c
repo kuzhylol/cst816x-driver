@@ -306,7 +306,7 @@ static int cst816x_probe(struct i2c_client *client)
 }
 
 static const struct i2c_device_id cst816x_id[] = {
-	{ "cst816s", 0 },
+	{ .name = "cst816s", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, cst816x_id);
