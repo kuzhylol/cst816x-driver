@@ -66,7 +66,7 @@ struct cst816x_gesture_mapping {
 };
 
 static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-	{CST816X_SWIPE, BTN_WHEEL},
+	{CST816X_SWIPE, KEY_UNKNOWN},
 	{CST816X_SWIPE_UP, KEY_UP},
 	{CST816X_SWIPE_DOWN, KEY_DOWN},
 	{CST816X_SWIPE_LEFT, KEY_LEFT},
@@ -206,7 +206,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (u8 i = 0; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
 		input_set_capability(priv->input, EV_KEY,
 				     cst816x_gesture_map[i].event_code);
 	}
