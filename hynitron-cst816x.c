@@ -184,7 +184,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	if (!priv->input)
 		return -ENOMEM;
 
-	priv->input->name = "CST816X Touchscreen";
+	priv->input->name = "Hynitron cst816x Touchscreen";
 	priv->input->phys = "input/ts";
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
