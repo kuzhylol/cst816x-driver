@@ -19,11 +19,6 @@
 
 #define CST816X_EVENT_TIMEOUT_MS 10
 
-enum cst816x_commands {
-	CST816X_SET_DOUBLE_TAP = 0x01,
-	CST816X_SET_STANDBY_MODE = 0x03,
-};
-
 enum cst816x_registers {
 	CST816X_FRAME = 0x01,
 	CST816X_MOTION = 0xEC,
@@ -244,28 +239,6 @@ static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 	return IRQ_HANDLED;
 }
 
-static int cst816x_suspend(struct device *dev)
-{
-	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
-
-	del_timer_sync(&priv->timer);
-	flush_delayed_work(&priv->dw);
-
-	return cst816x_i2c_write_reg(priv, CST816X_STANDBY,
-				     CST816X_SET_STANDBY_MODE);
-}
-
-static int cst816x_resume(struct device *dev)
-{
-	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
-
-	cst816x_reset(priv);
-
-	return cst816x_setup_regs(priv);
-}
-
-static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
-
 static int cst816x_probe(struct i2c_client *client)
 {
 	struct cst816x_priv *priv;
@@ -322,7 +295,6 @@ static struct i2c_driver cst816x_driver = {
 	.driver = {
 		.name = "cst816x",
 		.of_match_table = cst816x_of_match,
-		.pm = pm_sleep_ptr(&cst816x_pm_ops),
 	},
 	.id_table = cst816x_id,
 	.probe = cst816x_probe,
