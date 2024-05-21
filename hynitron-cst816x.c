@@ -56,8 +56,6 @@ struct cst816x_priv {
 	struct cst816x_info info;
 
 	u8 rxtx[8];
-
-	int irq;
 };
 
 struct cst816x_gesture_mapping {
@@ -251,7 +249,6 @@ static int cst816x_suspend(struct device *dev)
 {
 	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
 
-	disable_irq(priv->irq);
 	del_timer_sync(&priv->timer);
 	flush_delayed_work(&priv->dw);
 
@@ -262,14 +259,10 @@ static int cst816x_suspend(struct device *dev)
 static int cst816x_resume(struct device *dev)
 {
 	struct cst816x_priv *priv = i2c_get_clientdata(to_i2c_client(dev));
-	int rc;
 
 	cst816x_reset(priv);
-	rc = cst816x_setup_regs(priv);
-	if (!rc)
-		enable_irq(priv->irq);
 
-	return rc;
+	return cst816x_setup_regs(priv);
 }
 
 static DEFINE_SIMPLE_DEV_PM_OPS(cst816x_pm_ops, cst816x_suspend, cst816x_resume);
@@ -306,15 +299,10 @@ static int cst816x_probe(struct i2c_client *client)
 	if (client->irq <= 0)
 		return dev_err_probe(dev, client->irq, "irq lookup failed\n");
 
-	rc = devm_request_threaded_irq(dev, client->irq, NULL,
-				       cst816x_irq_cb,
-				       IRQF_ONESHOT | IRQF_NO_AUTOEN,
-				       dev->driver->name, priv);
+	rc = devm_request_threaded_irq(dev, client->irq, NULL, cst816x_irq_cb,
+				       IRQF_ONESHOT, dev->driver->name, priv);
 	if (rc)
 		return dev_err_probe(dev, client->irq, "irq request failed\n");
-
-	priv->irq = client->irq;
-	enable_irq(priv->irq);
 
 	return cst816x_register_input(priv);
 }
