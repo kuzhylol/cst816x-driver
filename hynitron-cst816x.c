@@ -137,7 +137,7 @@ static int cst816x_setup_regs(struct cst816x_priv *priv)
 	return cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
 }
 
-static void report_gesture_event(struct cst816x_priv *priv,
+static void report_gesture_event(const struct cst816x_priv *priv,
 				 enum cst816_gesture_code gesture_code,
 				 bool state)
 {
