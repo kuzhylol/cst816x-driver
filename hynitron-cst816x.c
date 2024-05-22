@@ -22,7 +22,6 @@
 enum cst816x_registers {
 	CST816X_FRAME = 0x01,
 	CST816X_MOTION = 0xEC,
-	CST816X_STANDBY = 0xA5,
 };
 
 enum cst816_gesture_code {
