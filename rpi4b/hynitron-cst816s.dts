@@ -10,7 +10,7 @@
                 reg = <0x15>;
                 interrupt-parent = <&gpio>;
                 interrupts = <4 1>; /* IRQF_TRIGGER_RISING */
-                reset-gpios = <&gpio 17 0>; /* GPIO_ACTIVE_HIGH */
+                reset-gpios = <&gpio 17 1>; /* GPIO_ACTIVE_LOW */
                 status="okay";
             };
         };

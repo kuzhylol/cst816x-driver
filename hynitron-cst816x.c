@@ -6,100 +6,57 @@
  */
 #include <linux/module.h>
 #include <linux/delay.h>
-#include <linux/gpio.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
-#include <linux/of_irq.h>
-#include <linux/timer.h>
-
-#define CST816X_MAX_X 240
-#define CST816X_MAX_Y CST816X_MAX_X
-
-#define CST816X_EVENT_TIMEOUT_MS 10
 
 enum cst816x_registers {
 	CST816X_FRAME = 0x01,
 	CST816X_MOTION = 0xEC,
 };
 
-enum cst816_gesture_code {
-	CST816X_SWIPE = 0x00,
+enum cst816x_gestures {
 	CST816X_SWIPE_UP = 0x01,
 	CST816X_SWIPE_DOWN = 0x02,
 	CST816X_SWIPE_LEFT = 0x03,
 	CST816X_SWIPE_RIGHT = 0x04,
 	CST816X_SINGLE_TAP = 0x05,
-	CST816X_DOUBLE_TAP = 0x0B,
 	CST816X_LONG_PRESS = 0x0C,
 };
 
-struct cst816x_info {
+struct cst816x_touch_info {
 	u8 gesture;
-	u8 x;
-	u8 y;
-};
+	u8 touch;
+	u8 abs_x;
+	u8 abs_y;
+} __packed;
 
 struct cst816x_priv {
 	struct device *dev;
 	struct i2c_client *client;
 	struct gpio_desc *reset;
 	struct input_dev *input;
-	struct timer_list timer;
-	struct delayed_work dw;
-	struct cst816x_info info;
+	struct cst816x_touch_info info;
 
 	u8 rxtx[8];
 };
 
-struct cst816x_gesture_mapping {
-	enum cst816_gesture_code gesture_code;
-	size_t event_code;
+struct cst816x_event_mapping {
+	enum cst816x_gestures gesture;
+	u16 event_code;
 };
 
-static const struct cst816x_gesture_mapping cst816x_gesture_map[] = {
-	{CST816X_SWIPE, KEY_UNKNOWN},
-	{CST816X_SWIPE_UP, KEY_UP},
-	{CST816X_SWIPE_DOWN, KEY_DOWN},
-	{CST816X_SWIPE_LEFT, KEY_LEFT},
-	{CST816X_SWIPE_RIGHT, KEY_RIGHT},
+static const struct cst816x_event_mapping cst816x_event_map[] = {
+	{CST816X_SWIPE_UP, BTN_FORWARD},
+	{CST816X_SWIPE_DOWN, BTN_BACK},
+	{CST816X_SWIPE_LEFT, BTN_LEFT},
+	{CST816X_SWIPE_RIGHT, BTN_RIGHT},
 	{CST816X_SINGLE_TAP, BTN_TOUCH},
-	{CST816X_DOUBLE_TAP, BTN_TOOL_DOUBLETAP},
 	{CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
 };
 
-static int cst816x_i2c_write_reg(struct cst816x_priv *priv, u8 reg, u8 cmd)
-{
-	struct i2c_client *client;
-	struct i2c_msg xfer;
-	int rc;
-
-	client = priv->client;
-
-	priv->rxtx[0] = reg;
-	priv->rxtx[1] = cmd;
-
-	xfer.addr = client->addr;
-	xfer.flags = 0;
-	xfer.len = 2;
-	xfer.buf = priv->rxtx;
-
-	rc = i2c_transfer(client->adapter, &xfer, 1);
-	if (rc != 1) {
-		if (rc >= 0)
-			rc = -EIO;
-	} else {
-		rc = 0;
-	}
-
-	if (rc < 0)
-		dev_err(&client->dev, "i2c tx err: %d\n", rc);
-
-	return rc;
-}
-
-static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
+static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer[2];
@@ -131,43 +88,23 @@ static int cst816x_i2c_read_reg(struct cst816x_priv *priv, u8 reg)
 	return rc;
 }
 
-static int cst816x_setup_regs(struct cst816x_priv *priv)
-{
-	return cst816x_i2c_write_reg(priv, CST816X_MOTION, CST816X_DOUBLE_TAP);
-}
-
-static void report_gesture_event(const struct cst816x_priv *priv,
-				 enum cst816_gesture_code gesture_code,
-				 bool state)
-{
-	const struct cst816x_gesture_mapping *lookup = NULL;
-
-	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
-		if (cst816x_gesture_map[i].gesture_code == gesture_code) {
-			lookup = &cst816x_gesture_map[i];
-			break;
-		}
-	}
-
-	if (lookup)
-		input_report_key(priv->input, lookup->event_code, state);
-}
-
 static int cst816x_process_touch(struct cst816x_priv *priv)
 {
 	u8 *raw;
 	int rc;
 
-	rc = cst816x_i2c_read_reg(priv, CST816X_FRAME);
+	rc = cst816x_i2c_read_register(priv, CST816X_FRAME);
 	if (!rc) {
 		raw = priv->rxtx;
 
 		priv->info.gesture = raw[0];
-		priv->info.x = ((raw[2] & 0x0F) << 8) | raw[3];
-		priv->info.y = ((raw[4] & 0x0F) << 8) | raw[5];
+		priv->info.touch = raw[1];
+		priv->info.abs_x = ((raw[2] & 0x0F) << 8) | raw[3];
+		priv->info.abs_y = ((raw[4] & 0x0F) << 8) | raw[5];
 
-		dev_dbg(priv->dev, "x: %d, y: %d, gesture: 0x%x\n",
-			priv->info.x, priv->info.y, priv->info.gesture);
+		dev_dbg(priv->dev, "x: %d, y: %d, t: %d, g: 0x%x\n",
+			priv->info.abs_x, priv->info.abs_y, priv->info.touch,
+			priv->info.gesture);
 	}
 
 	return rc;
@@ -184,56 +121,77 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (u8 i = CST816X_SWIPE_UP; i < ARRAY_SIZE(cst816x_gesture_map); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(cst816x_event_map); i++) {
 		input_set_capability(priv->input, EV_KEY,
-				     cst816x_gesture_map[i].event_code);
+				     cst816x_event_map[i].event_code);
 	}
 
-	input_set_abs_params(priv->input, ABS_X, 0, CST816X_MAX_X, 0, 0);
-	input_set_abs_params(priv->input, ABS_Y, 0, CST816X_MAX_Y, 0, 0);
-	input_set_capability(priv->input, EV_ABS, ABS_X);
-	input_set_capability(priv->input, EV_ABS, ABS_Y);
+	input_set_abs_params(priv->input, ABS_X, 0, 240, 0, 0);
+	input_set_abs_params(priv->input, ABS_Y, 0, 240, 0, 0);
 
 	return input_register_device(priv->input);
 }
 
 static void cst816x_reset(struct cst816x_priv *priv)
 {
-	gpiod_set_value_cansleep(priv->reset, 0);
-	msleep(100);
 	gpiod_set_value_cansleep(priv->reset, 1);
 	msleep(100);
+	gpiod_set_value_cansleep(priv->reset, 0);
+	msleep(100);
 }
 
-static void cst816x_timer_cb(struct timer_list *timer)
+static void report_gesture_event(const struct cst816x_priv *priv,
+				 enum cst816x_gestures gesture, bool touch)
 {
-	struct cst816x_priv *priv = from_timer(priv, timer, timer);
-
-	report_gesture_event(priv, priv->info.gesture, false);
-	input_sync(priv->input);
-}
-
-static void cst816x_dw_cb(struct work_struct *work)
-{
-	struct cst816x_priv *priv =
-		container_of(work, struct cst816x_priv, dw.work);
-
-	if (!cst816x_process_touch(priv)) {
-		input_report_abs(priv->input, ABS_X, priv->info.x);
-		input_report_abs(priv->input, ABS_Y, priv->info.y);
-		report_gesture_event(priv, priv->info.gesture, true);
-		input_sync(priv->input);
-
-		mod_timer(&priv->timer,
-			  jiffies + msecs_to_jiffies(CST816X_EVENT_TIMEOUT_MS));
+	for (unsigned int i = 0; i < ARRAY_SIZE(cst816x_event_map); i++) {
+		if (cst816x_event_map[i].gesture == gesture) {
+			input_report_key(priv->input,
+					 cst816x_event_map[i].event_code,
+					 touch);
+			break;
+		}
 	}
+
+	if (!touch)
+		input_report_key(priv->input, BTN_TOUCH, 0);
 }
 
+/*
+ * Supports five gestures: TOUCH, LEFT, RIGHT, FORWARD, BACK, and LONG_PRESS.
+ * Reports surface interaction, sliding coordinates and finger detachment.
+ *
+ * 1. TOUCH Gesture Scenario:
+ *
+ * [x/y] [touch] [gesture] [Action] [Report ABS] [Report Key]
+ *  x y   true    0x00      Touch    ABS_X_Y      BTN_TOUCH
+ *  x y   true    0x00      Slide    ABS_X_Y
+ *  x y   false   0x05      Gesture               BTN_TOUCH
+ *
+ * 2. LEFT, RIGHT, FORWARD, BACK, and LONG_PRESS Gestures Scenario:
+ *
+ * [x/y] [touch] [gesture] [Action] [Report ABS] [Report Key]
+ *  x y   true    0x00      Touch    ABS_X_Y      BTN_TOUCH
+ *  x y   true    0x01      Gesture  ABS_X_Y      BTN_FORWARD
+ *  x y   true    0x01      Slide    ABS_X_Y
+ *  x y   false   0x01      Detach                BTN_TOUCH | BTN_FORWARD
+ */
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
 	struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
 
-	schedule_delayed_work(&priv->dw, 0);
+	if (!cst816x_process_touch(priv)) {
+		if (priv->info.touch) {
+			input_report_abs(priv->input, ABS_X, priv->info.abs_x);
+			input_report_abs(priv->input, ABS_Y, priv->info.abs_y);
+			input_report_key(priv->input, BTN_TOUCH, 1);
+		}
+
+		if (priv->info.gesture)
+			report_gesture_event(priv, priv->info.gesture,
+					     priv->info.touch);
+
+		input_sync(priv->input);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -251,31 +209,23 @@ static int cst816x_probe(struct i2c_client *client)
 	priv->dev = dev;
 	priv->client = client;
 
-	INIT_DELAYED_WORK(&priv->dw, cst816x_dw_cb);
-	timer_setup(&priv->timer, cst816x_timer_cb, 0);
-
 	priv->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->reset))
 		return dev_err_probe(dev, PTR_ERR(priv->reset),
 				     "reset gpio not found\n");
 
-	if (priv->reset)
-		cst816x_reset(priv);
+	cst816x_reset(priv);
 
-	rc = cst816x_setup_regs(priv);
+	rc = cst816x_register_input(priv);
 	if (rc)
-		return dev_err_probe(dev, rc, "regs setup failed\n");
-
-	client->irq = of_irq_get(dev->of_node, 0);
-	if (client->irq <= 0)
-		return dev_err_probe(dev, client->irq, "irq lookup failed\n");
+		return dev_err_probe(dev, rc, "input register failed\n");
 
 	rc = devm_request_threaded_irq(dev, client->irq, NULL, cst816x_irq_cb,
 				       IRQF_ONESHOT, dev->driver->name, priv);
 	if (rc)
-		return dev_err_probe(dev, client->irq, "irq request failed\n");
+		return dev_err_probe(dev, rc, "irq request failed\n");
 
-	return cst816x_register_input(priv);
+	return 0;
 }
 
 static const struct i2c_device_id cst816x_id[] = {
