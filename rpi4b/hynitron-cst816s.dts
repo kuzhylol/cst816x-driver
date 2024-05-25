@@ -3,7 +3,7 @@
 
 / {
     fragment@0 {
-        target = <&i2c>;
+        target = <&i2c1>;
         __overlay__ {
             cst816s: cst816s@15 {
                 compatible = "hynitron,cst816s";
@@ -11,7 +11,6 @@
                 interrupt-parent = <&gpio>;
                 interrupts = <4 1>; /* IRQF_TRIGGER_RISING */
                 reset-gpios = <&gpio 17 1>; /* GPIO_ACTIVE_LOW */
-                status="okay";
             };
         };
     };
