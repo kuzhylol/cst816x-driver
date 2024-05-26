@@ -136,7 +136,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 static void cst816x_reset(struct cst816x_priv *priv)
 {
 	gpiod_set_value_cansleep(priv->reset, 1);
-	msleep(10);
+	msleep(50);
 	gpiod_set_value_cansleep(priv->reset, 0);
 	msleep(100);
 }
