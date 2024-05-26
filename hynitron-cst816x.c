@@ -173,7 +173,7 @@ static void report_gesture_event(const struct cst816x_priv *priv,
  *  x y   true    0x00      Touch    ABS_X_Y      BTN_TOUCH
  *  x y   true    0x01      Gesture  ABS_X_Y      BTN_FORWARD
  *  x y   true    0x01      Slide    ABS_X_Y
- *  x y   false   0x01      Detach                BTN_TOUCH | BTN_FORWARD
+ *  x y   false   0x01      Detach                BTN_FORWARD | BTN_TOUCH
  */
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
