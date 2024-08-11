@@ -29,35 +29,43 @@ enum cst816x_gestures {
 struct cst816x_touch_info {
 	u8 gesture;
 	u8 touch;
-	u8 abs_x;
-	u8 abs_y;
-} __packed;
+	u16 abs_x;
+	u16 abs_y;
+};
 
 struct cst816x_priv {
 	struct device *dev;
 	struct i2c_client *client;
 	struct gpio_desc *reset;
 	struct input_dev *input;
-	struct cst816x_touch_info info;
-
-	u8 rxtx[8];
 };
 
 struct cst816x_event_mapping {
 	enum cst816x_gestures gesture;
-	u16 event_code;
+	u16 code;
 };
 
-static const struct cst816x_event_mapping cst816x_event_map[] = {
+static const struct cst816x_event_mapping event_map[16] = {
 	{CST816X_SWIPE_UP, BTN_FORWARD},
-	{CST816X_SWIPE_DOWN, BTN_BACK},
-	{CST816X_SWIPE_LEFT, BTN_LEFT},
-	{CST816X_SWIPE_RIGHT, BTN_RIGHT},
-	{CST816X_SINGLE_TAP, BTN_TOUCH},
-	{CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP}
+        {CST816X_SWIPE_DOWN, BTN_BACK},
+        {CST816X_SWIPE_LEFT, BTN_LEFT},
+        {CST816X_SWIPE_RIGHT, BTN_RIGHT},
+        {CST816X_SINGLE_TAP, BTN_TOUCH},
+        {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED},
+        {KEY_RESERVED, KEY_RESERVED}
 };
 
-static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg)
+static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg,
+				     void *buf, size_t len)
 {
 	struct i2c_client *client;
 	struct i2c_msg xfer[2];
@@ -67,13 +75,13 @@ static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg)
 
 	xfer[0].addr = client->addr;
 	xfer[0].flags = 0;
-	xfer[0].len = sizeof(reg);
 	xfer[0].buf = &reg;
+	xfer[0].len = sizeof(reg);
 
 	xfer[1].addr = client->addr;
 	xfer[1].flags = I2C_M_RD;
-	xfer[1].len = sizeof(priv->rxtx);
-	xfer[1].buf = priv->rxtx;
+	xfer[1].buf = buf;
+	xfer[1].len = len;
 
 	rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
 	if (rc != ARRAY_SIZE(xfer)) {
@@ -89,23 +97,21 @@ static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg)
 	return rc;
 }
 
-static int cst816x_process_touch(struct cst816x_priv *priv)
+static int cst816x_process_touch(struct cst816x_priv *priv,
+				 struct cst816x_touch_info *info)
 {
-	u8 *raw;
+	u8 raw[8];
 	int rc;
 
-	rc = cst816x_i2c_read_register(priv, CST816X_FRAME);
+	rc = cst816x_i2c_read_register(priv, CST816X_FRAME, raw, sizeof(raw));
 	if (!rc) {
-		raw = priv->rxtx;
-
-		priv->info.gesture = raw[0];
-		priv->info.touch = raw[1];
-		priv->info.abs_x = ((raw[2] & 0x0F) << 8) | raw[3];
-		priv->info.abs_y = ((raw[4] & 0x0F) << 8) | raw[5];
+		info->gesture = raw[0];
+		info->touch = raw[1];
+		info->abs_x = ((raw[2] & 0x0F) << 8) | raw[3];
+		info->abs_y = ((raw[4] & 0x0F) << 8) | raw[5];
 
 		dev_dbg(priv->dev, "x: %d, y: %d, t: %d, g: 0x%x\n",
-			priv->info.abs_x, priv->info.abs_y, priv->info.touch,
-			priv->info.gesture);
+			info->abs_x, info->abs_y, info->touch, info->gesture);
 	}
 
 	return rc;
@@ -122,9 +128,8 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(cst816x_event_map); i++) {
-		input_set_capability(priv->input, EV_KEY,
-				     cst816x_event_map[i].event_code);
+	for (unsigned int i = 0; i < ARRAY_SIZE(event_map); i++) {
+		input_set_capability(priv->input, EV_KEY, event_map[i].code);
 	}
 
 	input_set_abs_params(priv->input, ABS_X, 0, 240, 0, 0);
@@ -144,14 +149,9 @@ static void cst816x_reset(struct cst816x_priv *priv)
 static void report_gesture_event(const struct cst816x_priv *priv,
 				 enum cst816x_gestures gesture, bool touch)
 {
-	for (unsigned int i = 0; i < ARRAY_SIZE(cst816x_event_map); i++) {
-		if (cst816x_event_map[i].gesture == gesture) {
-			input_report_key(priv->input,
-					 cst816x_event_map[i].event_code,
-					 touch);
-			break;
-		}
-	}
+	u16 key = event_map[gesture & 0x0F].code;
+	if (key != KEY_RESERVED)
+		input_report_key(priv->input, key, touch);
 
 	if (!touch)
 		input_report_key(priv->input, BTN_TOUCH, 0);
@@ -179,17 +179,17 @@ static void report_gesture_event(const struct cst816x_priv *priv,
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
 	struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
+	struct cst816x_touch_info info;
 
-	if (!cst816x_process_touch(priv)) {
-		if (priv->info.touch) {
-			input_report_abs(priv->input, ABS_X, priv->info.abs_x);
-			input_report_abs(priv->input, ABS_Y, priv->info.abs_y);
+	if (!cst816x_process_touch(priv, &info)) {
+		if (info.touch) {
+			input_report_abs(priv->input, ABS_X, info.abs_x);
+			input_report_abs(priv->input, ABS_Y, info.abs_y);
 			input_report_key(priv->input, BTN_TOUCH, 1);
 		}
 
-		if (priv->info.gesture)
-			report_gesture_event(priv, priv->info.gesture,
-					     priv->info.touch);
+		if (info.gesture)
+			report_gesture_event(priv, info.gesture, info.touch);
 
 		input_sync(priv->input);
 	}
