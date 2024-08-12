@@ -48,11 +48,11 @@ struct cst816x_event_mapping {
 
 static const struct cst816x_event_mapping event_map[16] = {
 	{CST816X_SWIPE_UP, BTN_FORWARD},
-        {CST816X_SWIPE_DOWN, BTN_BACK},
-        {CST816X_SWIPE_LEFT, BTN_LEFT},
-        {CST816X_SWIPE_RIGHT, BTN_RIGHT},
-        {CST816X_SINGLE_TAP, BTN_TOUCH},
-        {CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP},
+	{CST816X_SWIPE_DOWN, BTN_BACK},
+	{CST816X_SWIPE_LEFT, BTN_LEFT},
+	{CST816X_SWIPE_RIGHT, BTN_RIGHT},
+	{CST816X_SINGLE_TAP, BTN_TOUCH},
+	{CST816X_LONG_PRESS, BTN_TOOL_TRIPLETAP},
 	{CST816X_RESERVED, KEY_RESERVED},
 	{CST816X_RESERVED, KEY_RESERVED},
 	{CST816X_RESERVED, KEY_RESERVED},
@@ -129,9 +129,8 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 	priv->input->id.bustype = BUS_I2C;
 	input_set_drvdata(priv->input, priv);
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(event_map); i++) {
+	for (unsigned int i = 0; i < ARRAY_SIZE(event_map); i++)
 		input_set_capability(priv->input, EV_KEY, event_map[i].code);
-	}
 
 	input_set_abs_params(priv->input, ABS_X, 0, 240, 0, 0);
 	input_set_abs_params(priv->input, ABS_Y, 0, 240, 0, 0);
@@ -151,6 +150,7 @@ static void report_gesture_event(const struct cst816x_priv *priv,
 				 enum cst816x_gestures gesture, bool touch)
 {
 	u16 key = event_map[gesture & 0x0F].code;
+
 	if (key != KEY_RESERVED)
 		input_report_key(priv->input, key, touch);
 
