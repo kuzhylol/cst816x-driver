@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
+#include <asm/unaligned.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/gpio/consumer.h>
@@ -68,54 +69,49 @@ static const struct cst816x_event_mapping event_map[16] = {
 static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg,
 				     void *buf, size_t len)
 {
-	struct i2c_client *client;
-	struct i2c_msg xfer[2];
 	int rc;
+	struct i2c_msg xfer[] = {
+		{
+			.addr = priv->client->addr,
+			.flags = 0,
+			.buf = &reg,
+			.len = sizeof(reg),
+		},
+		{
+			.addr = priv->client->addr,
+			.flags = I2C_M_RD,
+			.buf = buf,
+			.len = len,
+		},
+	};
 
-	client = priv->client;
-
-	xfer[0].addr = client->addr;
-	xfer[0].flags = 0;
-	xfer[0].buf = &reg;
-	xfer[0].len = sizeof(reg);
-
-	xfer[1].addr = client->addr;
-	xfer[1].flags = I2C_M_RD;
-	xfer[1].buf = buf;
-	xfer[1].len = len;
-
-	rc = i2c_transfer(client->adapter, xfer, ARRAY_SIZE(xfer));
+	rc = i2c_transfer(priv->client->adapter, xfer, ARRAY_SIZE(xfer));
 	if (rc != ARRAY_SIZE(xfer)) {
-		if (rc >= 0)
-			rc = -EIO;
-	} else {
-		rc = 0;
+		rc = rc < 0 ? rc : -EIO;
+		dev_err(&priv->client->dev, "i2c rx err: %d\n", rc);
+		return rc;
 	}
 
-	if (rc < 0)
-		dev_err(&client->dev, "i2c rx err: %d\n", rc);
-
-	return rc;
+	return 0;
 }
 
-static int cst816x_process_touch(struct cst816x_priv *priv,
-				 struct cst816x_touch_info *info)
+static bool cst816x_process_touch(struct cst816x_priv *priv,
+				  struct cst816x_touch_info *info)
 {
 	u8 raw[8];
-	int rc;
 
-	rc = cst816x_i2c_read_register(priv, CST816X_FRAME, raw, sizeof(raw));
-	if (!rc) {
-		info->gesture = raw[0];
-		info->touch = raw[1];
-		info->abs_x = ((raw[2] & 0x0F) << 8) | raw[3];
-		info->abs_y = ((raw[4] & 0x0F) << 8) | raw[5];
+	if (cst816x_i2c_read_register(priv, CST816X_FRAME, raw, sizeof(raw)))
+		return false;
 
-		dev_dbg(priv->dev, "x: %d, y: %d, t: %d, g: 0x%x\n",
-			info->abs_x, info->abs_y, info->touch, info->gesture);
-	}
+	info->gesture = raw[0];
+	info->touch = raw[1];
+	info->abs_x = get_unaligned_be16(&raw[2]) & GENMASK(11, 0);
+	info->abs_y = get_unaligned_be16(&raw[4]) & GENMASK(11, 0);
 
-	return rc;
+	dev_dbg(priv->dev, "x: %d, y: %d, t: %d, g: 0x%x\n", info->abs_x,
+		info->abs_y, info->touch, info->gesture);
+
+	return true;
 }
 
 static int cst816x_register_input(struct cst816x_priv *priv)
@@ -140,10 +136,12 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 
 static void cst816x_reset(struct cst816x_priv *priv)
 {
-	gpiod_set_value_cansleep(priv->reset, 1);
-	msleep(50);
-	gpiod_set_value_cansleep(priv->reset, 0);
-	msleep(100);
+	if (priv->reset) {
+		gpiod_set_value_cansleep(priv->reset, 1);
+		msleep(50);
+		gpiod_set_value_cansleep(priv->reset, 0);
+		msleep(100);
+	}
 }
 
 static void report_gesture_event(const struct cst816x_priv *priv,
@@ -153,9 +151,6 @@ static void report_gesture_event(const struct cst816x_priv *priv,
 
 	if (key != KEY_RESERVED)
 		input_report_key(priv->input, key, touch);
-
-	if (!touch)
-		input_report_key(priv->input, BTN_TOUCH, 0);
 }
 
 /*
@@ -179,22 +174,28 @@ static void report_gesture_event(const struct cst816x_priv *priv,
  */
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
-	struct cst816x_priv *priv = (struct cst816x_priv *)cookie;
+	struct cst816x_priv *priv = cookie;
 	struct cst816x_touch_info info;
 
-	if (!cst816x_process_touch(priv, &info)) {
-		if (info.touch) {
-			input_report_abs(priv->input, ABS_X, info.abs_x);
-			input_report_abs(priv->input, ABS_Y, info.abs_y);
-			input_report_key(priv->input, BTN_TOUCH, 1);
-		}
+	if (!cst816x_process_touch(priv, &info))
+		goto out;
 
-		if (info.gesture)
-			report_gesture_event(priv, info.gesture, info.touch);
-
-		input_sync(priv->input);
+	if (info.touch) {
+		input_report_abs(priv->input, ABS_X, info.abs_x);
+		input_report_abs(priv->input, ABS_Y, info.abs_y);
+		input_report_key(priv->input, BTN_TOUCH, 1);
 	}
 
+	if (info.gesture) {
+		report_gesture_event(priv, info.gesture, info.touch);
+
+		if (!info.touch)
+			input_report_key(priv->input, BTN_TOUCH, 0);
+	}
+
+	input_sync(priv->input);
+
+out:
 	return IRQ_HANDLED;
 }
 
@@ -202,7 +203,7 @@ static int cst816x_probe(struct i2c_client *client)
 {
 	struct cst816x_priv *priv;
 	struct device *dev = &client->dev;
-	int rc;
+	int error;
 
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv)
@@ -211,21 +212,21 @@ static int cst816x_probe(struct i2c_client *client)
 	priv->dev = dev;
 	priv->client = client;
 
-	priv->reset = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
+	priv->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(priv->reset))
 		return dev_err_probe(dev, PTR_ERR(priv->reset),
 				     "reset gpio not found\n");
 
 	cst816x_reset(priv);
 
-	rc = cst816x_register_input(priv);
-	if (rc)
-		return dev_err_probe(dev, rc, "input register failed\n");
+	error = cst816x_register_input(priv);
+	if (error)
+		return dev_err_probe(dev, error, "input register failed\n");
 
-	rc = devm_request_threaded_irq(dev, client->irq, NULL, cst816x_irq_cb,
+	error = devm_request_threaded_irq(dev, client->irq, NULL, cst816x_irq_cb,
 				       IRQF_ONESHOT, dev->driver->name, priv);
-	if (rc)
-		return dev_err_probe(dev, rc, "irq request failed\n");
+	if (error)
+		return dev_err_probe(dev, error, "irq request failed\n");
 
 	return 0;
 }
