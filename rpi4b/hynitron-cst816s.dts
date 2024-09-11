@@ -11,6 +11,38 @@
                 interrupt-parent = <&gpio>;
                 interrupts = <4 1>; /* IRQF_TRIGGER_RISING */
                 reset-gpios = <&gpio 17 1>; /* GPIO_ACTIVE_LOW */
+
+                touchscreen {
+                    swipe_up {
+                        cst816x,gesture = <0x1>;
+                        linux,code = <0x115>; // BTN_FORWARD
+                    };
+
+                    swipe_down {
+                        cst816x,gesture = <0x2>;
+                        linux,code = <0x116>; // BTN_BACK
+                    };
+
+                    swipe_left {
+                        cst816x,gesture = <0x3>;
+                        linux,code = <0x110>; // BTN_LEFT
+                    };
+
+                    swipe_right {
+                        cst816x,gesture = <0x4>;
+                        linux,code = <0x111>; // BTN_RIGHT
+                    };
+
+                    single_tap {
+                        cst816x,gesture = <0x5>;
+                        linux,code = <0x14A>; // BTN_TOUCH
+                    };
+
+                    long_press {
+                        cst816x,gesture = <0xC>;
+                        linux,code = <0x14E>; // BTN_TOOL_TRIPLETAP
+                    };
+                };
             };
         };
     };
