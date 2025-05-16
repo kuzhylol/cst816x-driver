@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Driver for I2C connected Hynitron CST816X Touchscreen
+ * Driver for I2C connected Hynitron CST816x Touchscreen
  *
- * Copyright (C) 2024 Oleh Kuzhylnyi <kuzhylol@gmail.com>
+ * Copyright (C) 2025 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
 #include <asm/unaligned.h>
 #include <linux/delay.h>
