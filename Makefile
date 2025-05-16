@@ -1,12 +1,9 @@
 obj-m += hynitron-cst816x.o
 
+SRC := $(shell pwd)
+
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	$(MAKE) -C $(KERNEL_SRC) M=$(SRC)
 
-install: hynitron-cst816x.ko
-	mkdir -p /lib/modules/$(shell uname -r)/extra
-	install -m 644 hynitron-cst816x.ko /lib/modules/$(shell uname -r)/extra/
-	depmod -a $(shell uname -r)
-
-clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+modules_install:
+	$(MAKE) -C $(KERNEL_SRC) M=$(SRC) modules_install
