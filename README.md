@@ -8,7 +8,7 @@ This guide helps you build, install, and set up a kernel module and device tree 
 
 ## 📌 Documentation
 
-### Raspberry Pi to Display Pinout
+### Raspberry Pi 4B to Display Pinout
 
 | Module Pin | Raspberry Pi (BCM) |
 |------------|--------------------|
