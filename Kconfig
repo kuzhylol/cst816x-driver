@@ -1,9 +1,9 @@
 config TOUCHSCREEN_HYNITRON_CST816X
-	tristate "Hynitron CST816X touchscreen support"
+	tristate "Hynitron CST816x series touchscreen"
 	depends on I2C
 	help
 	  Say Y here if you have a touchscreen using a Hynitron
-	  CST816X touchscreen controller.
+	  CST816x series touchscreen controller.
 
 	  If unsure, say N.
 
