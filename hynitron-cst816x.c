@@ -14,7 +14,7 @@
 #include <linux/module.h>
 
 #define CST816X_NUM_KEYS 16
-#define CST816X_RD_CMD 0x01
+#define CST816X_RD_REG 0x01
 #define CST816X_TOUCH 0x00
 
 struct cst816x_touch_desc {
@@ -85,7 +85,7 @@ static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg,
 static bool cst816x_process_touch(struct cst816x_priv *priv,
 				  struct cst816x_touch_desc *desc)
 {
-	if (cst816x_i2c_read_register(priv, CST816X_RD_CMD, desc, sizeof(*desc)))
+	if (cst816x_i2c_read_register(priv, CST816X_RD_REG, desc, sizeof(*desc)))
 		return false;
 
 	desc->abs_x = get_unaligned_be16(&desc->abs_x) & GENMASK(11, 0);
