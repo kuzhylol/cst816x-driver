@@ -9,9 +9,6 @@ title: Hynitron CST816x Series Capacitive Touch controller
 maintainers:
   - Oleh Kuzhylnyi <kuzhylol@gmail.com>
 
-allOf:
-  - $ref: input.yaml#
-
 description: |
   Bindings for CST816x high performance self-capacitance touch chip series
   with single point gesture and real two-point operation.
