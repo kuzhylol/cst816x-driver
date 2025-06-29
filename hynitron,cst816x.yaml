@@ -27,12 +27,6 @@ properties:
   reset-gpios:
     maxItems: 1
 
-  "#address-cells":
-    const: 1
-
-  "#size-cells":
-    const: 0
-
   linux,keycodes:
     minItems: 1
     maxItems: 16
