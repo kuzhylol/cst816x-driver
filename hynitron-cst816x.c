@@ -36,18 +36,24 @@ static int cst816x_parse_keycodes(struct device *dev, struct cst816x_priv *priv)
 {
 	int ret;
 
-	ret = device_property_count_u32(dev, "linux,keycodes");
-	if (ret > ARRAY_SIZE(priv->keycode)) {
-		dev_err(dev, "Too many keycodes: %d\n", ret);
-		return -EINVAL;
-	}
-	priv->keycodemax = ret;
+	if (device_property_present(dev, "linux,keycodes")) {
+		ret = device_property_count_u32(dev, "linux,keycodes");
+		if (ret < 0) {
+			dev_err(dev, "Failed to count keys: %d\n", ret);
+			return ret;
+		} else if (ret > ARRAY_SIZE(priv->keycode)) {
+			dev_err(dev, "Too many keycodes: %d\n", ret);
+			return -EINVAL;
+		}
+		priv->keycodemax = ret;
 
-	ret = device_property_read_u32_array(dev, "linux,keycodes",
-					     priv->keycode, priv->keycodemax);
-	if (ret) {
-		dev_err(dev, "Failed to read keycodes: %d\n", ret);
-		return ret;
+		ret = device_property_read_u32_array(dev, "linux,keycodes",
+						     priv->keycode,
+						     priv->keycodemax);
+		if (ret) {
+			dev_err(dev, "Failed to read keycodes: %d\n", ret);
+			return ret;
+		}
 	}
 
 	return 0;
