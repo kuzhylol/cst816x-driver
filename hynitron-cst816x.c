@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * Driver for I2C connected Hynitron CST816x Touchscreen
+ * Driver for I2C connected Hynitron CST816x Series Touchscreen
  *
  * Copyright (C) 2025 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
@@ -39,10 +39,10 @@ static int cst816x_parse_keycodes(struct device *dev, struct cst816x_priv *priv)
 	if (device_property_present(dev, "linux,keycodes")) {
 		ret = device_property_count_u32(dev, "linux,keycodes");
 		if (ret < 0) {
-			dev_err(dev, "Failed to count keys: %d\n", ret);
+			dev_err(dev, "failed to count keys: %d\n", ret);
 			return ret;
 		} else if (ret > ARRAY_SIZE(priv->keycode)) {
-			dev_err(dev, "Too many keycodes: %d\n", ret);
+			dev_err(dev, "too many keys defined: %d\n", ret);
 			return -EINVAL;
 		}
 		priv->keycodemax = ret;
@@ -51,7 +51,7 @@ static int cst816x_parse_keycodes(struct device *dev, struct cst816x_priv *priv)
 						     priv->keycode,
 						     priv->keycodemax);
 		if (ret) {
-			dev_err(dev, "Failed to read keycodes: %d\n", ret);
+			dev_err(dev, "failed to read keycodes: %d\n", ret);
 			return ret;
 		}
 	}
