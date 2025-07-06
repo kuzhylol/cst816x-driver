@@ -4,24 +4,23 @@
  *
  * Copyright (C) 2025 Oleh Kuzhylnyi <kuzhylol@gmail.com>
  */
-#include <asm/unaligned.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/input.h>
+#include <asm/unaligned.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
 
-#define CST816X_NUM_KEYS 16
 #define CST816X_RD_REG 0x01
-#define CST816X_TOUCH 0x00
+#define CST816X_NUM_KEYS 5
 
-struct cst816x_touch_desc {
-	u8 gesture;
-	u8 touch;
-	__be16 abs_x;
-	__be16 abs_y;
+struct cst816x_touch {
+	u8 gest;
+	u8 active;
+	u16 abs_x;
+	u16 abs_y;
 } __packed;
 
 struct cst816x_priv {
@@ -88,17 +87,36 @@ static int cst816x_i2c_read_register(struct cst816x_priv *priv, u8 reg,
 	return 0;
 }
 
+static u8 cst816x_gest_idx(u8 gest) {
+	u8 index;
+
+	switch (gest) {
+	case 0x01: // Slide up gesture
+	case 0x02: // Slide down gesture
+	case 0x03: // Slide left gesture
+	case 0x04: // Slide right gesture
+		index = gest;
+		break;
+	case 0x0c: // Long press gesture
+	default:
+		index = CST816X_NUM_KEYS;
+		break;
+	}
+
+	return index - 1;
+}
+
 static bool cst816x_process_touch(struct cst816x_priv *priv,
-				  struct cst816x_touch_desc *desc)
+				  struct cst816x_touch *tch)
 {
-	if (cst816x_i2c_read_register(priv, CST816X_RD_REG, desc, sizeof(*desc)))
+	if (cst816x_i2c_read_register(priv, CST816X_RD_REG, tch, sizeof(*tch)))
 		return false;
 
-	desc->abs_x = get_unaligned_be16(&desc->abs_x) & GENMASK(11, 0);
-	desc->abs_y = get_unaligned_be16(&desc->abs_y) & GENMASK(11, 0);
+	tch->abs_x = get_unaligned_be16(&tch->abs_x) & GENMASK(11, 0);
+	tch->abs_y = get_unaligned_be16(&tch->abs_y) & GENMASK(11, 0);
 
 	dev_dbg(&priv->client->dev, "x: %u, y: %u, t: %u, g: 0x%x\n",
-		desc->abs_x, desc->abs_y, desc->touch, desc->gesture);
+		tch->abs_x, tch->abs_y, tch->active, tch->gest);
 
 	return true;
 }
@@ -116,6 +134,7 @@ static int cst816x_register_input(struct cst816x_priv *priv)
 
 	input_set_abs_params(priv->input, ABS_X, 0, 240, 0, 0);
 	input_set_abs_params(priv->input, ABS_Y, 0, 240, 0, 0);
+	input_set_capability(priv->input, EV_KEY, BTN_TOUCH);
 
 	for (int i = 0; i < priv->keycodemax; i++) {
 		if (priv->keycode[i] == KEY_RESERVED)
@@ -138,25 +157,21 @@ static void cst816x_reset(struct cst816x_priv *priv)
 static irqreturn_t cst816x_irq_cb(int irq, void *cookie)
 {
 	struct cst816x_priv *priv = cookie;
-	struct cst816x_touch_desc desc;
+	struct cst816x_touch tch;
 
-	if (!cst816x_process_touch(priv, &desc))
+	if (!cst816x_process_touch(priv, &tch))
 		return IRQ_HANDLED;
 
-	if (desc.touch) {
-		input_report_key(priv->input, priv->keycode[CST816X_TOUCH], 1);
-		input_report_abs(priv->input, ABS_X, desc.abs_x);
-		input_report_abs(priv->input, ABS_Y, desc.abs_y);
+	input_report_abs(priv->input, ABS_X, tch.abs_x);
+	input_report_abs(priv->input, ABS_Y, tch.abs_y);
+
+	if (tch.gest) {
+		input_report_key(priv->input,
+				 priv->keycode[cst816x_gest_idx(tch.gest)],
+				 tch.active);
 	}
 
-	if (desc.gesture) {
-		input_report_key(priv->input, priv->keycode[desc.gesture & 0x0F],
-				 desc.touch);
-
-		if (!desc.touch)
-			input_report_key(priv->input,
-					 priv->keycode[CST816X_TOUCH], 0);
-	}
+	input_report_key(priv->input, BTN_TOUCH, tch.active);
 
 	input_sync(priv->input);
 
