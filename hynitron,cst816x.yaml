@@ -29,18 +29,12 @@ properties:
 
   linux,keycodes:
     minItems: 1
-    maxItems: 16
-    description: |
-      Specifies the numeric keycodes associated with each available gesture in
-      the following order (enter 0 for unused and reserved gestures):
-      0: Touch
-      1: Swipe up
-      2: Swipe down
-      3: Swipe left
-      4: Swipe right
-      5-11: Reserved
-      12: Long press
-      13-15: Reserved
+    items:
+      - description: Slide up gesture
+      - description: Slide down gesture
+      - description: Slide left gesture
+      - description: Slide right gesture
+      - description: Long press gesture
 
 required:
   - compatible
@@ -55,28 +49,17 @@ examples:
     #include <dt-bindings/input/linux-event-codes.h>
     #include <dt-bindings/interrupt-controller/irq.h>
     i2c {
-          #address-cells = <1>;
-          #size-cells = <0>;
-          touchscreen@15 {
-              compatible = "hynitron,cst816s";
-              reg = <0x15>;
-              interrupt-parent = <&gpio0>;
-              interrupts = <4 IRQ_TYPE_EDGE_RISING>;
-              reset-gpios = <&gpio 17 GPIO_ACTIVE_LOW>;
-              linux,keycodes = <BTN_TOUCH>,
-                               <KEY_UP>,
-                               <KEY_DOWN>,
-                               <KEY_LEFT>,
-                               <KEY_RIGHT>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <KEY_RESERVED>,
-                               <BTN_TOOL_TRIPLETAP>;
-          };
+        #address-cells = <1>;
+        #size-cells = <0>;
+        touchscreen@15 {
+            compatible = "hynitron,cst816s";
+            reg = <0x15>;
+            interrupt-parent = <&gpio0>;
+            interrupts = <4 IRQ_TYPE_EDGE_RISING>;
+            reset-gpios = <&gpio 17 GPIO_ACTIVE_LOW>;
+            linux,keycodes = <KEY_UP>, <KEY_DOWN>, <KEY_LEFT>, <KEY_RIGHT>,
+                             <BTN_TOOL_TRIPLETAP>;
+        };
     };
 
 ...
