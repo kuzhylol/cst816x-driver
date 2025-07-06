@@ -11,18 +11,10 @@
                 interrupt-parent = <&gpio>;
                 interrupts = <4 1>; /* IRQF_TRIGGER_RISING */
                 reset-gpios = <&gpio 17 1>; /* GPIO_ACTIVE_LOW */
-                linux,keycodes = <0x14a>,  // BTN_TOUCH
-                    <0x67>,   // KEY_UP
+                linux,keycodes = <0x67>, // KEY_UP
                     <0x6c>,   // KEY_DOWN
                     <0x69>,   // KEY_LEFT
                     <0x6a>,   // KEY_RIGHT
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
-                    <0x00>,   // KEY_RESERVED
                     <0x14e>;  // BTN_TOOL_TRIPLETAP
             };
         };
